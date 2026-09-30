@@ -211,7 +211,7 @@ export function chromeSources(
   if (os === 'windows') {
     const ap = arch === 'arm64' ? 'arm64-stable-statsdef_1' : 'x64-stable-statsdef_1';
     const tag = encodeURIComponent(
-      `appguid={8A69D345-D564-463C-AFF1-A69D9E530F96}&iid={00000000-0000-0000-0000-000000000000}&lang=en&browser=4&usagestats=0&appname=Google Chrome&needsadmin=false&ap=${ap}&installdataindex=empty`,
+      `appguid={8A69D345-D564-463C-AFF1-A69D9E530F96}&iid={00000000-0000-0000-0000-000000000000}&lang=en&browser=4&usagestats=0&appname=Google%20Chrome&needsadmin=false&ap=${ap}&installdataindex=empty`,
     );
     return [
       {

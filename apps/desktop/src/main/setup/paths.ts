@@ -19,7 +19,7 @@ export function pathProblem(p: string): string | null {
   return null;
 }
 
-function writable(dir: string): boolean {
+export function writable(dir: string): boolean {
   try {
     mkdirSync(dir, { recursive: true });
     accessSync(dir, constants.W_OK);

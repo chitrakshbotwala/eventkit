@@ -345,7 +345,7 @@ export class SetupEngine extends EventEmitter {
     if (!this.state.installRoot) return false;
     this.running = true;
     this.emitNow();
-    const ctx = this.context(manifest);
+    const ctx = this.context(manifest, !opts.includeDoctor);
     let ok = true;
     try {
       for (const c of manifest.components) {
@@ -416,7 +416,7 @@ export class SetupEngine extends EventEmitter {
     return manifest;
   }
 
-  private context(manifest: ManifestPayload): ComponentContext {
+  private context(manifest: ManifestPayload, quick = false): ComponentContext {
     if (!this.state.installRoot) {
       const choice = chooseInstallRoot(this.deps.platform, this.state.installRoot);
       if (!choice.root) {
@@ -441,6 +441,7 @@ export class SetupEngine extends EventEmitter {
       exec: this.deps.exec,
       signal,
       simulate: this.deps.simulate,
+      quick,
       log: logger.scope('setup'),
       step: (step: SetupStep, message?: string) => {
         if (!this.current) return;

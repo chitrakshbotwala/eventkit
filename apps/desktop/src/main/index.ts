@@ -1,4 +1,4 @@
-import { app, clipboard, net, shell } from 'electron';
+import { app, clipboard, net, session, shell } from 'electron';
 import { z } from 'zod';
 import { EmailSchema } from '@eventkit/shared';
 import type { AppInfo, Phase2View, QrView } from '../common/ipc';
@@ -47,7 +47,9 @@ const engine = new SetupEngine({
   arch,
   statePath: paths.file(config.simulate ? 'setup-state.simulate.json' : 'setup-state.json'),
   envStatePath: paths.file(config.simulate ? 'env.simulate.json' : 'env.json'),
-  runners: config.simulate ? simulatedRunners(simOpts) : realRunners(),
+  runners: config.simulate
+    ? simulatedRunners(simOpts)
+    : realRunners({ resolveProxy: (url) => session.defaultSession.resolveProxy(url) }),
   manifestSource,
   downloader: config.simulate
     ? simulatedDownloader(simOpts)

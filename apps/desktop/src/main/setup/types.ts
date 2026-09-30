@@ -74,6 +74,8 @@ export interface ComponentContext {
   exec: ToolRunner;
   signal: AbortSignal;
   simulate: boolean;
+  /** Periodic re-verification: prefer cheap checks over launching heavy tools. */
+  quick: boolean;
   /** Report the current step (shown in the checklist). */
   step(step: SetupStep, message?: string): void;
   /** Report progress within the current component (0-100) and/or a message. */
