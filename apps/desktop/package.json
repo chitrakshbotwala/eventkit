@@ -5,7 +5,6 @@
   "private": true,
   "description": "One-click Flutter toolchain setup, attendance QR and offline-phase monitor",
   "author": "Event organizers",
-  "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
