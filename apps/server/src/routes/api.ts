@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import {
   ManifestQuerySchema,
   ProgressBodySchema,
+  ReadinessBodySchema,
   type MeResponse,
   type ScheduleResponse,
   type TimeResponse,
@@ -15,6 +16,7 @@ import { toProfile } from '../services/attendees';
 import { signedManifestFor } from '../services/manifest/service';
 import { getSchedule, scheduleDto } from '../services/schedule';
 import { recordProgress } from '../services/progress';
+import { submitReadiness } from '../services/readiness';
 
 export async function apiRoutes(app: FastifyInstance) {
   const { ctx } = app;
@@ -51,6 +53,12 @@ export async function apiRoutes(app: FastifyInstance) {
       await recordProgress(ctx, req.attendee!, req.device!, body);
       return { ok: true };
     },
+  );
+
+  app.post(
+    '/api/readiness',
+    { preHandler: requireAttendee, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req) => submitReadiness(ctx, req.attendee!, req.device!, parse(ReadinessBodySchema, req.body), req.ip),
   );
 
   // Starter project zip (content-addressed; integrity is checked by the client against the manifest).

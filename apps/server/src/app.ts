@@ -12,6 +12,7 @@ import { HttpError } from './lib/errors';
 import { attendeeAuthRoutes } from './routes/auth';
 import { apiRoutes } from './routes/api';
 import { adminAuthRoutes } from './routes/admin/auth';
+import { adminAttendanceRoutes } from './routes/admin/attendance';
 import { adminAttendeeRoutes } from './routes/admin/attendees';
 import { adminScheduleRoutes } from './routes/admin/schedule';
 import { adminSettingsRoutes } from './routes/admin/settings';
@@ -114,6 +115,7 @@ export async function buildApp(opts: BuildOptions): Promise<FastifyInstance> {
   await app.register(apiRoutes);
   await app.register(adminAuthRoutes);
   await app.register(adminAttendeeRoutes);
+  await app.register(adminAttendanceRoutes);
   await app.register(adminScheduleRoutes);
   await app.register(adminSettingsRoutes);
   await app.register(adminUserRoutes);

@@ -11,6 +11,10 @@ import { handle, send } from './ipc';
 import { errMsg, logger } from './logger';
 import { manifestSource } from './manifest';
 import { ProgressReporter } from './progress-reporter';
+import { currentQr } from './qr';
+import { submitReadiness } from './readiness';
+import { secureStore } from './secure-store';
+import { msUntilNextWindow } from '@eventkit/shared/node';
 import { realRunners } from './setup/components';
 import { Downloader } from './setup/downloader';
 import { SetupEngine } from './setup/engine';
@@ -69,7 +73,9 @@ const engine = new SetupEngine({
   simulate: config.simulate,
   elevateDelayMs: config.simulate ? 1500 : 3000,
   onComplete: async () => {
-    log.info('setup complete');
+    log.info('setup complete; submitting readiness report');
+    await submitReadiness(engine);
+    void pushQr();
   },
 });
 
@@ -79,7 +85,34 @@ engine.on('snapshot', (s) => {
   reporter.push(s);
 });
 engine.on('status', () => reporter.push(engine.snapshot(), true));
-auth.on('changed', (s) => send('auth:changed', s));
+auth.on('changed', (s) => {
+  send('auth:changed', s);
+  void pushQr();
+});
+
+async function pushQr() {
+  if (getMainWindow()) send('qr:changed', await currentQr(engine));
+}
+
+/** Refresh the QR exactly at each 60 s window boundary. */
+function scheduleQrTick() {
+  setTimeout(() => {
+    void pushQr();
+    scheduleQrTick();
+  }, msUntilNextWindow(Date.now(), api.serverOffsetMs) + 50);
+}
+
+/**
+ * Local re-verification. A regression hides the QR and is reported to the
+ * server (scans refused); a repaired toolchain is re-submitted for readiness.
+ */
+async function reverifyAndReport(includeDoctor: boolean) {
+  const wasReady = Boolean(auth.profile?.ready);
+  const ok = await engine.reverify({ includeDoctor });
+  if (ok && (!secureStore.get('qrSecret') || !auth.profile?.ready)) await submitReadiness(engine);
+  else if (!ok && wasReady) await submitReadiness(engine, { force: true });
+  await pushQr();
+}
 logger.on('line', (line) => send('log:line', line));
 
 function registerIpc() {
@@ -124,9 +157,7 @@ function registerIpc() {
     },
   );
   handle(CHANNELS.setupCancel, null, () => engine.cancel());
-  handle(CHANNELS.setupReverify, null, async () => {
-    await engine.reverify({ includeDoctor: true });
-  });
+  handle(CHANNELS.setupReverify, null, () => reverifyAndReport(!config.simulate));
   handle(CHANNELS.setupRepair, null, () => {
     void engine.repair();
   });
@@ -134,11 +165,7 @@ function registerIpc() {
     clipboard.writeText(diagnostics());
   });
 
-  handle(CHANNELS.qrCurrent, null, (): QrView => ({
-    visible: false,
-    reason: 'Finish setup to get your QR code.',
-    checkedIn: false,
-  }));
+  handle(CHANNELS.qrCurrent, null, (): Promise<QrView> => currentQr(engine));
   handle(CHANNELS.phase2State, null, (): Phase2View => idlePhase2());
   handle(CHANNELS.phase2Sync, null, () => undefined);
 
@@ -252,16 +279,17 @@ app
       quit: () => app.quit(),
     });
 
+    scheduleQrTick();
     if (auth.state().signedIn) {
       void auth.refresh();
       void api.syncClock().catch(() => undefined);
       await engine.prepare();
-      if (engine.isComplete) void engine.reverify({ includeDoctor: !config.simulate });
+      if (engine.isComplete) void reverifyAndReport(!config.simulate);
     }
     // Re-verify the toolchain every 10 minutes; refresh profile (check-in badge) every 30 s.
     setInterval(() => {
       if (auth.state().signedIn && engine.installRoot)
-        void engine.reverify({ includeDoctor: false });
+        void reverifyAndReport(false);
     }, 10 * 60_000);
     setInterval(() => {
       if (auth.state().signedIn) void auth.refresh();
