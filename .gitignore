@@ -1,0 +1,17 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+apps/server/data/
+apps/server/prisma/schema.postgres.prisma
+apps/desktop/src/main/generated/
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

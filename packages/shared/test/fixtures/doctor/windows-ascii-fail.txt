@@ -1,0 +1,23 @@
+[√] Flutter (Channel stable, 3.35.4, on Microsoft Windows [Version 10.0.19045.5737], locale en-IN)
+    * Flutter version 3.35.4 on channel stable at C:\dev	oolchainlutter
+    * Dart version 3.9.2
+
+[X] Android toolchain - develop for Android devices
+    X cmdline-tools component is missing.
+      Try installing or updating Android Studio.
+      Alternatively, download the tools from https://developer.android.com/studio#command-line-tools-only
+    X Android license status unknown.
+
+[X] Chrome - develop for the web (Cannot find Chrome executable at .\Google\Chrome\Application\chrome.exe)
+    ! Cannot find Chrome. Try setting CHROME_EXECUTABLE to a Chrome executable.
+
+[!] Android Studio (not installed)
+    * Android Studio not found; download from https://developer.android.com/studio/index.html
+
+[√] Connected device (2 available)
+    * Windows (desktop) * windows * windows-x64 * Microsoft Windows
+
+[√] Network resources
+    * All expected network resources are available.
+
+! Doctor found issues in 3 categories.
