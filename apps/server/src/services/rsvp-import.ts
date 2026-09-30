@@ -17,7 +17,7 @@ function findCol(headers: string[], candidates: string[]): number {
  * Recognised columns: email, name (or first/last name).
  */
 export async function importRsvpCsv(ctx: AppContext, csv: string): Promise<ImportResult> {
-  const rows = parseCsv(csv.replace(/^﻿/, ''), {
+  const rows = parseCsv(csv.charCodeAt(0) === 0xfeff ? csv.slice(1) : csv, {
     skip_empty_lines: true,
     relax_column_count: true,
     trim: true,

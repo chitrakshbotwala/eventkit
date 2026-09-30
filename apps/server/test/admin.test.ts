@@ -156,7 +156,7 @@ describe('RSVP import', () => {
       method: 'POST',
       url: '/admin/attendees/import',
       headers: adminHeaders(cookie),
-      payload: { csv: '﻿x@example.com,X Person\ny@example.com,Y Person' },
+      payload: { csv: String.fromCharCode(0xfeff) + 'x@example.com,X Person\ny@example.com,Y Person' },
     });
     expect(json(res)).toMatchObject({ created: 2 });
   });

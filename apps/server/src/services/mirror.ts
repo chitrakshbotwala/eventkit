@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 
 export function mirrorRoot(dataDir: string) {
   return resolve(dataDir, 'mirror');
@@ -63,7 +64,7 @@ export async function ensureMirrored(
   const h = createHash('sha256');
   let size = 0;
   await pipeline(
-    Readable.fromWeb(res.body as import('node:stream/web').ReadableStream),
+    Readable.fromWeb(res.body as WebReadableStream),
     new Transform({
       transform(chunk: Buffer, _enc, cb) {
         h.update(chunk);
