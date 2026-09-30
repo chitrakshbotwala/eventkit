@@ -96,7 +96,10 @@ export const AndroidComponentSchema = z.object({
 export const ChromeComponentSchema = z.object({
   id: z.literal('chrome'),
   ...base,
+  /** Windows installer / macOS dmg. */
   artifact: ArtifactSchema.optional(),
+  /** Linux: picked by package manager (deb for apt, rpm for dnf/zypper). */
+  linuxPackages: z.object({ deb: ArtifactSchema, rpm: ArtifactSchema }).optional(),
   wingetId: z.string().optional(),
 });
 

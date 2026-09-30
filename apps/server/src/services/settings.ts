@@ -3,6 +3,10 @@ import { DEFAULT_MIN_DISK_GB, SettingsSchema, type Settings } from '@eventkit/sh
 
 const SETTINGS_KEY = 'settings';
 
+export type SettingsPatch = Partial<Omit<Settings, 'components'>> & {
+  components?: Partial<Settings['components']>;
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   pinnedFlutterVersion: null,
   mirrorBaseUrl: null,
@@ -25,10 +29,7 @@ export async function getSettings(prisma: PrismaClient): Promise<Settings> {
   return parsed.success ? parsed.data : structuredClone(DEFAULT_SETTINGS);
 }
 
-export async function saveSettings(
-  prisma: PrismaClient,
-  patch: Partial<Settings>,
-): Promise<Settings> {
+export async function saveSettings(prisma: PrismaClient, patch: SettingsPatch): Promise<Settings> {
   const current = await getSettings(prisma);
   const next = SettingsSchema.parse({
     ...current,

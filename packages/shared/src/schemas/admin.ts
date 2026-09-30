@@ -134,7 +134,12 @@ export const SettingsSchema = z.object({
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
-export const SettingsUpdateBodySchema = SettingsSchema.omit({ starterProject: true }).partial();
+export const SettingsUpdateBodySchema = SettingsSchema.omit({
+  starterProject: true,
+  components: true,
+})
+  .partial()
+  .extend({ components: SettingsSchema.shape.components.partial().optional() });
 export type SettingsUpdateBody = z.infer<typeof SettingsUpdateBodySchema>;
 
 export const ComplianceRowSchema = z.object({
