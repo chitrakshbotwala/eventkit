@@ -14,6 +14,7 @@ import { upstreamResolver } from '../src/services/manifest/resolver';
 import { manifestPayloadFor } from '../src/services/manifest/service';
 import { ensureMirrored } from '../src/services/mirror';
 import type { AppContext } from '../src/context';
+import { devProvider } from '../src/services/google';
 
 async function main() {
   const env = loadEnv();
@@ -25,7 +26,8 @@ async function main() {
     resolver: upstreamResolver,
     now: Date.now,
     event: () => currentEvent(prisma, env),
-    mailer: { configured: false, send: async () => undefined, verify: async () => undefined },
+    identity: devProvider(),
+    log: console,
   };
   const seen = new Set<string>();
   for (const { os, arch } of SUPPORTED_TARGETS) {

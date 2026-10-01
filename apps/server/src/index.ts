@@ -20,8 +20,10 @@ async function main() {
   await app.listen({ host: env.HOST, port: env.PORT });
   if (!env.MANIFEST_SIGNING_KEY)
     app.log.warn('MANIFEST_SIGNING_KEY missing: /api/manifest will fail (run pnpm keys:gen)');
-  if (env.NODE_ENV !== 'production' && !app.ctx.mailer.configured) {
-    app.log.warn('SMTP not configured: OTP codes are printed to this console (development only)');
+  if (app.ctx.identity.kind === 'dev') {
+    app.log.warn(
+      'GOOGLE_CLIENT_ID not set: attendees sign in on a development page that accepts any email',
+    );
   }
 }
 

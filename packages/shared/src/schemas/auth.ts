@@ -8,15 +8,6 @@ import {
   PlatformSchema,
 } from './common';
 
-export const RequestOtpBodySchema = z.object({ email: EmailSchema });
-export type RequestOtpBody = z.infer<typeof RequestOtpBodySchema>;
-
-export const RequestOtpResponseSchema = z.object({
-  ok: z.literal(true),
-  message: z.string(),
-});
-export type RequestOtpResponse = z.infer<typeof RequestOtpResponseSchema>;
-
 export const DeviceInfoSchema = z.object({
   clientDeviceId: z.uuid(),
   os: PlatformSchema,
@@ -27,12 +18,38 @@ export const DeviceInfoSchema = z.object({
 });
 export type DeviceInfo = z.infer<typeof DeviceInfoSchema>;
 
-export const VerifyOtpBodySchema = z.object({
-  email: EmailSchema,
-  code: z.string().regex(/^\d{6}$/),
+/** base64url without padding, as used for PKCE verifiers/challenges and random tokens. */
+const B64URL = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * GET /auth/google/start: the desktop app opens this in the system browser.
+ * `port` is its loopback listener, `challenge` = base64url(sha256(verifier)) (PKCE S256)
+ * and `state` is echoed back to the listener.
+ */
+export const SignInStartQuerySchema = z.object({
+  port: z.coerce.number().int().min(1024).max(65535),
+  challenge: z.string().length(43).regex(B64URL),
+  state: z.string().min(16).max(128).regex(B64URL),
+});
+export type SignInStartQuery = z.infer<typeof SignInStartQuerySchema>;
+
+/** POST /auth/google/exchange: redeem the one-time code with the PKCE verifier. */
+export const SignInExchangeBodySchema = z.object({
+  code: z.string().min(32).max(128).regex(B64URL),
+  verifier: z.string().min(43).max(128).regex(B64URL),
   device: DeviceInfoSchema,
 });
-export type VerifyOtpBody = z.infer<typeof VerifyOtpBodySchema>;
+export type SignInExchangeBody = z.infer<typeof SignInExchangeBodySchema>;
+
+/** Error codes the server hands to the desktop app's loopback listener. */
+export const SignInErrorCodeSchema = z.enum([
+  'not_registered',
+  'email_unverified',
+  'cancelled',
+  'expired',
+  'failed',
+]);
+export type SignInErrorCode = z.infer<typeof SignInErrorCodeSchema>;
 
 export const AttendeeProfileSchema = z.object({
   id: z.string(),
@@ -44,7 +61,7 @@ export const AttendeeProfileSchema = z.object({
 });
 export type AttendeeProfile = z.infer<typeof AttendeeProfileSchema>;
 
-export const VerifyOtpResponseSchema = z.object({
+export const SignInResponseSchema = z.object({
   token: z.string(),
   expiresAt: IsoDateSchema,
   attendee: AttendeeProfileSchema,
@@ -53,7 +70,7 @@ export const VerifyOtpResponseSchema = z.object({
   deviceKey: z.string(),
   serverTime: z.number(),
 });
-export type VerifyOtpResponse = z.infer<typeof VerifyOtpResponseSchema>;
+export type SignInResponse = z.infer<typeof SignInResponseSchema>;
 
 export const MeResponseSchema = z.object({
   attendee: AttendeeProfileSchema,

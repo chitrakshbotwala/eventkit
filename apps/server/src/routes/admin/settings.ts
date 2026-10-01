@@ -12,9 +12,8 @@ import {
   manifestPayloadFor,
   startResolve,
 } from '../../services/manifest/service';
+import { callbackUrl } from '../../services/google';
 import { getSettings, saveSettings } from '../../services/settings';
-
-const SmtpTestBodySchema = z.object({ to: z.email() });
 
 export async function adminSettingsRoutes(app: FastifyInstance) {
   const { ctx } = app;
@@ -27,7 +26,11 @@ export async function adminSettingsRoutes(app: FastifyInstance) {
 
   app.get('/admin/settings', { preHandler: superadmin }, async () => ({
     settings: await getSettings(ctx.prisma),
-    smtpConfigured: ctx.mailer.configured,
+    signIn: {
+      provider: ctx.identity.kind,
+      redirectUri: callbackUrl(ctx.env),
+      origin: new URL(ctx.env.PUBLIC_BASE_URL).origin,
+    },
     resolve: await getResolveStatus(ctx),
   }));
 
@@ -101,20 +104,5 @@ export async function adminSettingsRoutes(app: FastifyInstance) {
     const settings = await saveSettings(ctx.prisma, { starterProject: null });
     await audit(ctx.prisma, { ...actor(req), action: 'settings.starter_remove', ip: req.ip });
     return { settings };
-  });
-
-  app.post('/admin/settings/smtp-test', { preHandler: superadmin }, async (req) => {
-    const { to } = parse(SmtpTestBodySchema, req.body);
-    try {
-      if (ctx.mailer.configured) await ctx.mailer.verify();
-      await ctx.mailer.send(
-        to,
-        `${ctx.env.EVENT_NAME}: SMTP test`,
-        'SMTP is configured correctly.',
-      );
-      return { ok: true, configured: ctx.mailer.configured };
-    } catch (err) {
-      throw badRequest('smtp_failed', err instanceof Error ? err.message : 'SMTP test failed');
-    }
   });
 }

@@ -236,17 +236,29 @@ model AdminSession {
   ip        String?
 }
 
-model OtpCode {
-  id         String    @id @default(cuid())
-  email      String
-  codeHash   String
-  createdAt  DateTime  @default(now())
-  expiresAt  DateTime
-  attempts   Int       @default(0)
-  consumedAt DateTime?
-  ip         String?
+/// One "Sign in with Google" attempt started by a desktop app (loopback redirect + PKCE).
+model SignInRequest {
+  id             String    @id @default(cuid())
+  /// sha256 of the OAuth `state` sent to Google.
+  stateHash      String    @unique
+  nonce          String
+  /// PKCE verifier for the server's own exchange with Google.
+  googleVerifier String
+  /// PKCE S256 challenge from the desktop app; its verifier redeems the one-time code.
+  appChallenge   String
+  /// Opaque value echoed back to the desktop app's loopback listener.
+  appState       String
+  redirectPort   Int
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+  attendeeId     String?
+  /// sha256 of the one-time code handed to the desktop app after Google confirmed the email.
+  codeHash       String?   @unique
+  codeExpiresAt  DateTime?
+  consumedAt     DateTime?
+  ip             String?
 
-  @@index([email, createdAt])
+  @@index([expiresAt])
 }
 
 model AuditLog {

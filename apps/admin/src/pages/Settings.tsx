@@ -20,16 +20,16 @@ import {
   Th,
   Toggle,
 } from '../components/ui';
-import { api, errorMessage } from '../lib/api';
+import { api, errorMessage, type SignInInfo } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fmtDateTime, fmtRelative } from '../lib/format';
 
-type Tab = 'toolchain' | 'manifest' | 'email' | 'users' | 'account' | 'audit';
+type Tab = 'toolchain' | 'manifest' | 'signin' | 'users' | 'account' | 'audit';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'toolchain', label: 'Toolchain' },
   { id: 'manifest', label: 'Manifest & starter project' },
-  { id: 'email', label: 'Email' },
+  { id: 'signin', label: 'Attendee sign-in' },
   { id: 'users', label: 'Admin users' },
   { id: 'account', label: 'My account' },
   { id: 'audit', label: 'Audit log' },
@@ -74,7 +74,7 @@ export function SettingsPage() {
       ) : tab === 'manifest' ? (
         <ManifestSection settings={q.data!.settings} />
       ) : (
-        <EmailSection configured={q.data!.smtpConfigured} />
+        <SignInSection info={q.data!.signIn} />
       )}
     </>
   );
@@ -471,62 +471,49 @@ function ManifestSection({ settings }: { settings: Settings }) {
   );
 }
 
-// ---------- email ----------
+// ---------- attendee sign-in ----------
 
-function EmailSection({ configured }: { configured: boolean }) {
-  const { admin } = useAuth();
-  const [to, setTo] = useState(admin?.email ?? '');
-  const test = useMutation({ mutationFn: () => api.smtpTest(to.trim()) });
+function SignInSection({ info }: { info: SignInInfo }) {
   return (
-    <Card title="Email (OTP delivery)">
+    <Card title="Attendee sign-in (Google)">
       <div className="mb-4 flex items-center gap-2 text-sm">
-        SMTP:{' '}
-        {configured ? (
-          <Badge tone="green">configured</Badge>
+        Provider:{' '}
+        {info.provider === 'google' ? (
+          <Badge tone="green">Google</Badge>
         ) : (
-          <Badge tone="amber">not configured</Badge>
+          <Badge tone="amber">development page</Badge>
         )}
-        {!configured && (
+        {info.provider === 'dev' && (
           <span className="text-slate-500">
-            In development, OTP codes are printed to the server console. Configure SMTP_* env vars
-            for production.
+            GOOGLE_CLIENT_ID is not set, so attendees sign in on a test page that accepts any email.
+            Production requires a Google OAuth client.
           </span>
         )}
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          test.mutate();
-        }}
-        className="flex flex-wrap items-end gap-3"
-      >
-        <div className="w-80">
-          <Field label="Send a test email to">
-            {(id) => (
-              <Input
-                id={id}
-                type="email"
-                required
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            )}
-          </Field>
-        </div>
-        <Button type="submit" variant="primary" disabled={test.isPending}>
-          {test.isPending && <Spinner />} Send test
-        </Button>
-      </form>
-      <div className="mt-3">
-        {test.isSuccess && (
-          <Banner tone="success">
-            {test.data.configured
-              ? 'Test email sent.'
-              : 'Not configured: the message was logged to the server console.'}
-          </Banner>
-        )}
-        {test.error && <Banner tone="error">{errorMessage(test.error)}</Banner>}
-      </div>
+      <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+        Attendees click <b>Continue with Google</b> in the desktop app. Their Google account email
+        must match their RSVP email (fix mismatches in Attendees by editing the email). No emails
+        are sent.
+      </p>
+      <dl className="grid gap-3 text-sm sm:grid-cols-[max-content_1fr]">
+        <dt className="font-medium">Authorized redirect URI</dt>
+        <dd>
+          <code className="break-all rounded bg-slate-100 px-2 py-1 dark:bg-slate-800">
+            {info.redirectUri}
+          </code>
+        </dd>
+        <dt className="font-medium">Authorized JavaScript origin</dt>
+        <dd>
+          <code className="break-all rounded bg-slate-100 px-2 py-1 dark:bg-slate-800">
+            {info.origin}
+          </code>
+        </dd>
+      </dl>
+      <p className="mt-3 text-xs text-slate-500">
+        Google Cloud console → APIs &amp; Services → Credentials → Create OAuth client ID → Web
+        application. Publish the OAuth consent screen (&quot;In production&quot;), otherwise only
+        listed test users can sign in.
+      </p>
     </Card>
   );
 }

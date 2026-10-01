@@ -22,14 +22,14 @@ import { adminStreamRoutes } from './routes/admin/stream';
 import { adminUserRoutes } from './routes/admin/users';
 import { currentEvent } from './services/event';
 import { Hub } from './services/hub';
-import { createMailer, type Mailer } from './services/mailer';
+import { createIdentityProvider, type IdentityProvider } from './services/google';
 import { mirrorRoot } from './services/mirror';
 import { upstreamResolver, type ManifestResolver } from './services/manifest/resolver';
 
 export interface BuildOptions {
   env: Env;
   prisma: PrismaClient;
-  mailer?: Mailer;
+  identity?: IdentityProvider;
   resolver?: ManifestResolver;
   now?: () => number;
   logger?: boolean;
@@ -51,7 +51,8 @@ export async function buildApp(opts: BuildOptions): Promise<FastifyInstance> {
   const ctx: AppContext = {
     env,
     prisma,
-    mailer: opts.mailer ?? createMailer(env, app.log),
+    identity: opts.identity ?? createIdentityProvider(env, opts.now ?? Date.now),
+    log: app.log,
     hub: new Hub(),
     resolver: opts.resolver ?? upstreamResolver,
     now: opts.now ?? Date.now,
@@ -83,7 +84,8 @@ export async function buildApp(opts: BuildOptions): Promise<FastifyInstance> {
       reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');
     }
     const type = String(reply.getHeader('content-type') ?? '');
-    if (type.startsWith('text/html')) {
+    // Pages that need a different policy (the dev sign-in page) set their own.
+    if (type.startsWith('text/html') && !reply.hasHeader('content-security-policy')) {
       reply.header(
         'content-security-policy',
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",

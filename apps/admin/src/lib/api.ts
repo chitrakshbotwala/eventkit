@@ -184,6 +184,15 @@ export interface SearchHit {
   checkedInAt: string | null;
 }
 
+export interface SignInInfo {
+  /** 'google' when GOOGLE_CLIENT_ID/SECRET are set, 'dev' for the development page. */
+  provider: 'google' | 'dev';
+  /** Authorized redirect URI to register on the Google OAuth client. */
+  redirectUri: string;
+  /** Authorized JavaScript origin (not strictly needed, but Google asks). */
+  origin: string;
+}
+
 export interface ResolveStatus {
   state: 'idle' | 'running' | 'done' | 'failed';
   startedAt?: string;
@@ -270,9 +279,7 @@ export const api = {
   feed: (limit = 200) => request<{ items: FeedItem[] }>(`/admin/monitoring/feed${qs({ limit })}`),
 
   settings: () =>
-    request<{ settings: Settings; smtpConfigured: boolean; resolve: ResolveStatus }>(
-      '/admin/settings',
-    ),
+    request<{ settings: Settings; signIn: SignInInfo; resolve: ResolveStatus }>('/admin/settings'),
   saveSettings: (patch: SettingsUpdateBody) =>
     request<{ settings: Settings }>('/admin/settings', { method: 'PUT', body: patch }),
   resolveManifest: () =>
@@ -290,8 +297,6 @@ export const api = {
     }),
   removeStarter: () =>
     request<{ settings: Settings }>('/admin/settings/starter-project', { method: 'DELETE' }),
-  smtpTest: (to: string) =>
-    request<{ ok: true; configured: boolean }>('/admin/settings/smtp-test', { body: { to } }),
 
   users: () => request<{ items: AdminUser[] }>('/admin/users'),
   createUser: (body: { email: string; name: string; role: string; password: string }) =>

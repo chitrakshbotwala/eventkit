@@ -1,7 +1,30 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import type { AuthState } from '@common/ipc';
 import { Banner, Button, Card, Spinner } from '../components/ui';
-import { ek, useAction } from '../lib/hooks';
+import { ek } from '../lib/hooks';
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-5 w-5" aria-hidden="true">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  );
+}
 
 export function Login({
   onSignedIn,
@@ -12,26 +35,20 @@ export function Login({
   notice?: string;
   simulate?: boolean;
 }) {
-  const [step, setStep] = useState<'email' | 'code'>('email');
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
-  const request = useAction(ek.auth.requestOtp);
-  const verify = useAction(ek.auth.verifyOtp);
+  const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState<{ code?: string; message: string } | null>(null);
 
-  async function submitEmail(e: FormEvent) {
-    e.preventDefault();
-    const res = await request.run(email.trim());
-    if (res) {
-      setMessage(res.message);
-      setStep('code');
+  async function signIn() {
+    setError(null);
+    setWaiting(true);
+    try {
+      onSignedIn(await ek.auth.signInWithGoogle());
+    } catch (err) {
+      const e = err as Error & { code?: string };
+      if (e.code !== 'cancelled') setError({ code: e.code, message: e.message });
+    } finally {
+      setWaiting(false);
     }
-  }
-
-  async function submitCode(e: FormEvent) {
-    e.preventDefault();
-    const res = await verify.run(email.trim(), code.trim());
-    if (res) onSignedIn(res);
   }
 
   return (
@@ -43,92 +60,43 @@ export function Login({
           </div>
           <h1 className="text-2xl font-semibold">Welcome to the event</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Sign in with the email you RSVP&apos;d with.
+            Sign in with the Google account you RSVP&apos;d with.
           </p>
         </div>
         <Card>
-          {notice && (
-            <div className="mb-4">
-              <Banner tone="warn">{notice}</Banner>
-            </div>
-          )}
-          {step === 'email' ? (
-            <form onSubmit={submitEmail} className="space-y-4">
-              <label className="block">
-                <span className="text-sm font-medium">Email</span>
-                <input
-                  type="email"
-                  required
-                  autoFocus
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-950"
-                  placeholder="you@example.com"
-                />
-              </label>
-              {request.error && <Banner tone="error">{request.error}</Banner>}
-              <Button
-                variant="primary"
-                type="submit"
-                className="w-full"
-                disabled={request.busy || !email}
-              >
-                {request.busy && <Spinner />} Send me a code
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={submitCode} className="space-y-4">
-              {message && <Banner tone="info">{message}</Banner>}
-              <label className="block">
-                <span className="text-sm font-medium">6-digit code</span>
-                <input
-                  inputMode="numeric"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  required
-                  autoFocus
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-center text-2xl tracking-[0.5em] outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-950"
-                  placeholder="••••••"
-                />
-              </label>
-              {verify.error && <Banner tone="error">{verify.error}</Banner>}
-              <Button
-                variant="primary"
-                type="submit"
-                className="w-full"
-                disabled={verify.busy || code.length !== 6}
-              >
-                {verify.busy && <Spinner />} Sign in
-              </Button>
-              <div className="flex justify-between text-sm">
-                <button
-                  type="button"
-                  className="text-slate-500 hover:underline"
-                  onClick={() => setStep('email')}
-                >
-                  Use a different email
-                </button>
-                <button
-                  type="button"
-                  className="text-brand-600 hover:underline disabled:opacity-50"
-                  disabled={request.busy}
-                  onClick={() =>
-                    void request.run(email.trim()).then((r) => r && setMessage(r.message))
-                  }
-                >
-                  Resend code
-                </button>
+          <div className="space-y-4">
+            {notice && <Banner tone="warn">{notice}</Banner>}
+            {error && (
+              <Banner tone="error">
+                {error.message}
+                {error.code === 'not_registered' && (
+                  <span className="mt-1 block">
+                    If you RSVP&apos;d with a different email, sign in with that Google account, or
+                    ask the help desk to update your RSVP email.
+                  </span>
+                )}
+              </Banner>
+            )}
+            {waiting ? (
+              <div className="space-y-4 text-center">
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  <Spinner /> Finish signing in in your browser…
+                </div>
+                <div className="flex justify-center gap-2">
+                  <Button onClick={() => void ek.auth.reopenSignIn()}>Open browser again</Button>
+                  <Button onClick={() => void ek.auth.cancelSignIn()}>Cancel</Button>
+                </div>
               </div>
-            </form>
-          )}
+            ) : (
+              <Button variant="primary" className="w-full" onClick={() => void signIn()}>
+                <GoogleMark /> Continue with Google
+              </Button>
+            )}
+          </div>
         </Card>
         <p className="mt-4 text-center text-xs text-slate-500">
-          Not on the list? Contact the organizers at the help desk.
-          {simulate && ' (Simulate mode: codes are printed in the server console.)'}
+          Your browser opens Google&apos;s sign-in page. EventKit only learns your name and email.
+          {simulate && ' (Development server: the browser shows a test page instead of Google.)'}
         </p>
       </div>
     </div>

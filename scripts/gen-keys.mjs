@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Generates the Ed25519 manifest signing key pair and the OTP pepper.
+// Generates the Ed25519 manifest signing key pair.
 //  - private key -> apps/server/.env  (MANIFEST_SIGNING_KEY)
 //  - public key  -> apps/desktop/.env (MAIN_VITE_MANIFEST_PUBKEYS), embedded at build time
 // Usage: node scripts/gen-keys.mjs [--force] [--print]
-import { generateKeyPairSync, randomBytes } from 'node:crypto';
+import { generateKeyPairSync } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +53,3 @@ if (hasKey && !force) {
   ]);
   console.log('Wrote manifest signing key (server) and public key (desktop).');
 }
-upsertEnv(serverEnv, resolve(root, 'apps/server/.env.example'), [
-  ['OTP_PEPPER', randomBytes(32).toString('base64url'), false],
-]);

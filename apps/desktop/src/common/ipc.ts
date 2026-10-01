@@ -112,8 +112,10 @@ export interface EventKitApi {
   };
   auth: {
     state(): Promise<AuthState>;
-    requestOtp(email: string): Promise<{ message: string }>;
-    verifyOtp(email: string, code: string): Promise<AuthState>;
+    /** Opens the system browser; resolves once the attendee is signed in. */
+    signInWithGoogle(): Promise<AuthState>;
+    cancelSignIn(): Promise<void>;
+    reopenSignIn(): Promise<void>;
     signOut(): Promise<void>;
     refresh(): Promise<AuthState>;
   };
@@ -166,8 +168,9 @@ export const CHANNELS = {
   appInfo: 'app:info',
   openExternal: 'app:openExternal',
   authState: 'auth:state',
-  requestOtp: 'auth:requestOtp',
-  verifyOtp: 'auth:verifyOtp',
+  signInWithGoogle: 'auth:signInWithGoogle',
+  cancelSignIn: 'auth:cancelSignIn',
+  reopenSignIn: 'auth:reopenSignIn',
   signOut: 'auth:signOut',
   authRefresh: 'auth:refresh',
   setupSnapshot: 'setup:snapshot',

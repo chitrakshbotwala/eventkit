@@ -52,12 +52,10 @@ export const QR_WINDOW_MS = 60_000;
 /** Server accepts the current window plus/minus this many windows. */
 export const QR_ACCEPT_SKEW_WINDOWS = 1;
 
-export const OTP_LENGTH = 6;
-export const OTP_TTL_MS = 10 * 60_000;
-export const OTP_MAX_ATTEMPTS = 5;
-export const OTP_MAX_PER_WINDOW = 3;
-export const OTP_WINDOW_MS = 10 * 60_000;
-export const OTP_COOLDOWN_MS = 30_000;
+/** How long an attendee has to finish Google sign-in in the browser. */
+export const SIGNIN_REQUEST_TTL_MS = 10 * 60_000;
+/** Lifetime of the one-time code the desktop app redeems for a session. */
+export const SIGNIN_CODE_TTL_MS = 2 * 60_000;
 
 export const ATTENDEE_SESSION_TTL_MS = 30 * 24 * 3600_000;
 export const ADMIN_SESSION_TTL_MS = 12 * 3600_000;

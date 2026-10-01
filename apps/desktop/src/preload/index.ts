@@ -22,8 +22,9 @@ const api: EventKitApi = {
   },
   auth: {
     state: () => call(CHANNELS.authState),
-    requestOtp: (email) => call(CHANNELS.requestOtp, { email }),
-    verifyOtp: (email, code) => call(CHANNELS.verifyOtp, { email, code }),
+    signInWithGoogle: () => call(CHANNELS.signInWithGoogle),
+    cancelSignIn: () => call(CHANNELS.cancelSignIn),
+    reopenSignIn: () => call(CHANNELS.reopenSignIn),
     signOut: () => call(CHANNELS.signOut),
     refresh: () => call(CHANNELS.authRefresh),
   },

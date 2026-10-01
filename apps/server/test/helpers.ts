@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -9,7 +10,7 @@ import { buildApp } from '../src/app';
 import { loadEnv } from '../src/env';
 import { hashPassword } from '../src/lib/passwords';
 import { resetEventCache } from '../src/services/event';
-import { resetOtpLimiter } from '../src/services/otp';
+import type { IdentityProvider } from '../src/services/google';
 import { resetAdminLoginLimiter } from '../src/routes/admin/auth';
 import { invalidateCompliance } from '../src/services/compliance';
 import type { ManifestResolver } from '../src/services/manifest/resolver';
@@ -18,16 +19,9 @@ const DB_URL = `file:${resolve(__dirname, '../prisma/test.db').replace(/\\/g, '/
 export const ADMIN_ORIGIN = 'http://admin.test';
 export const keys = generateSigningKeyPair();
 
-export interface Mail {
-  to: string;
-  subject: string;
-  text: string;
-}
-
 export interface TestApp {
   app: FastifyInstance;
   prisma: PrismaClient;
-  mails: Mail[];
   clock: { now: number };
   close(): Promise<void>;
 }
@@ -35,13 +29,16 @@ export interface TestApp {
 let shared: PrismaClient | null = null;
 
 export async function makeApp(
-  opts: { resolver?: ManifestResolver; env?: Record<string, string> } = {},
+  opts: {
+    resolver?: ManifestResolver;
+    identity?: IdentityProvider;
+    env?: Record<string, string>;
+  } = {},
 ): Promise<TestApp> {
   const env = loadEnv({
     NODE_ENV: 'test',
     DATABASE_URL: DB_URL,
     LOG_LEVEL: 'silent',
-    OTP_PEPPER: 'test-pepper-test-pepper',
     MANIFEST_SIGNING_KEY: keys.privateKey,
     ADMIN_ORIGINS: ADMIN_ORIGIN,
     PUBLIC_BASE_URL: 'http://localhost:8080',
@@ -54,7 +51,6 @@ export async function makeApp(
   shared ??= new PrismaClient({ datasources: { db: { url: DB_URL } } });
   const prisma = shared;
   await resetDb(prisma);
-  const mails: Mail[] = [];
   const clock = { now: Date.UTC(2026, 9, 10, 8, 0, 0) };
   const app = await buildApp({
     env,
@@ -62,20 +58,13 @@ export async function makeApp(
     logger: false,
     now: () => clock.now,
     resolver: opts.resolver,
-    mailer: {
-      configured: true,
-      send: async (to, subject, text) => {
-        mails.push({ to, subject, text });
-      },
-      verify: async () => undefined,
-    },
+    identity: opts.identity,
   });
-  return { app, prisma, mails, clock, close: () => app.close() };
+  return { app, prisma, clock, close: () => app.close() };
 }
 
 export async function resetDb(prisma: PrismaClient) {
   resetEventCache();
-  resetOtpLimiter();
   resetAdminLoginLimiter();
   invalidateCompliance();
   await prisma.$transaction([
@@ -90,7 +79,7 @@ export async function resetDb(prisma: PrismaClient) {
     prisma.schedule.deleteMany(),
     prisma.adminSession.deleteMany(),
     prisma.adminUser.deleteMany(),
-    prisma.otpCode.deleteMany(),
+    prisma.signInRequest.deleteMany(),
     prisma.auditLog.deleteMany(),
     prisma.setting.deleteMany(),
     prisma.event.deleteMany(),
@@ -112,21 +101,71 @@ export const device = (over: Partial<DeviceInfo> = {}): DeviceInfo => ({
   ...over,
 });
 
-export function lastCode(t: TestApp, email: string): string {
-  const mail = [...t.mails].reverse().find((m) => m.to === email);
-  const code = mail && /\b(\d{6})\b/.exec(mail.subject)?.[1];
-  if (!code) throw new Error(`no OTP mail for ${email}`);
-  return code;
+export function pkce() {
+  const verifier = randomBytes(32).toString('base64url');
+  return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
+}
+
+export const LOOPBACK_PORT = 53682;
+
+/** Start a sign-in like the desktop app does; returns the redirect (to Google or the dev page). */
+export async function startSignIn(
+  t: TestApp,
+  over: { port?: number; challenge?: string; state?: string } = {},
+) {
+  const q = new URLSearchParams({
+    port: String(over.port ?? LOOPBACK_PORT),
+    challenge: over.challenge ?? pkce().challenge,
+    state: over.state ?? 'app-state-0123456789',
+  });
+  return t.app.inject({ method: 'GET', url: `/auth/google/start?${q.toString()}` });
+}
+
+/** The OAuth `state` the server sent to the identity provider. */
+export function providerState(start: LightMyRequestResponse): string {
+  const state = new URL(String(start.headers.location), 'http://server.test').searchParams.get(
+    'state',
+  );
+  if (!state) throw new Error(`no state in ${start.headers.location}`);
+  return state;
+}
+
+/** Google redirecting the browser back to the server. */
+export function callback(t: TestApp, params: Record<string, string>) {
+  return t.app.inject({
+    method: 'GET',
+    url: `/auth/google/callback?${new URLSearchParams(params).toString()}`,
+  });
+}
+
+/** Where the server sent the browser after the callback (the app's loopback listener). */
+export const loopback = (res: LightMyRequestResponse) => new URL(String(res.headers.location));
+
+/** Browser part of the sign-in using the development provider (any email). */
+export async function browserSignIn(t: TestApp, email: string, challenge: string) {
+  const start = await startSignIn(t, { challenge });
+  const cont = await t.app.inject({
+    method: 'GET',
+    url: `/auth/google/dev/continue?${new URLSearchParams({ state: providerState(start), email }).toString()}`,
+  });
+  return t.app.inject({ method: 'GET', url: String(cont.headers.location) });
+}
+
+export function exchange(t: TestApp, code: string, verifier: string, dev: DeviceInfo = device()) {
+  return t.app.inject({
+    method: 'POST',
+    url: '/auth/google/exchange',
+    payload: { code, verifier, device: dev },
+  });
 }
 
 /** Full attendee login; returns bearer token + device key. */
 export async function loginAttendee(t: TestApp, email: string, dev: DeviceInfo = device()) {
-  await t.app.inject({ method: 'POST', url: '/auth/request-otp', payload: { email } });
-  const res = await t.app.inject({
-    method: 'POST',
-    url: '/auth/verify-otp',
-    payload: { email, code: lastCode(t, email), device: dev },
-  });
+  const { verifier, challenge } = pkce();
+  const cb = await browserSignIn(t, email, challenge);
+  const code = loopback(cb).searchParams.get('code');
+  if (!code) throw new Error(`sign-in failed: ${String(cb.headers.location ?? cb.body)}`);
+  const res = await exchange(t, code, verifier, dev);
   if (res.statusCode !== 200) throw new Error(`login failed: ${res.body}`);
   return res.json() as {
     token: string;

@@ -30,18 +30,14 @@ const EnvSchema = z
     EVENT_NAME: z.string().default('Flutter Build Day'),
     EVENT_TIMEZONE: z.string().default('UTC'),
 
-    OTP_PEPPER: z.string().min(16).optional(),
     MANIFEST_SIGNING_KEY: z.string().optional(),
     MANIFEST_ALLOW_PLACEHOLDER: bool(true),
     MANIFEST_TTL_HOURS: z.coerce.number().positive().default(72),
     MIN_APP_VERSION: z.string().default('0.1.0'),
 
-    SMTP_HOST: z.string().optional(),
-    SMTP_PORT: z.coerce.number().int().default(587),
-    SMTP_SECURE: bool(false),
-    SMTP_USER: z.string().optional(),
-    SMTP_PASS: z.string().optional(),
-    MAIL_FROM: z.string().default('EventKit <no-reply@localhost>'),
+    /** Google OAuth "Web application" client used for attendee sign-in. */
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
     CONTACT_HINT: z.string().default('Not on the list? Contact the organizers at the help desk.'),
 
     SUPERADMIN_EMAIL: z.string().optional(),
@@ -51,8 +47,13 @@ const EnvSchema = z
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') return;
-    if (!env.OTP_PEPPER)
-      ctx.addIssue({ code: 'custom', path: ['OTP_PEPPER'], message: 'required in production' });
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GOOGLE_CLIENT_ID'],
+        message: 'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required in production',
+      });
+    }
     if (!env.MANIFEST_SIGNING_KEY) {
       ctx.addIssue({
         code: 'custom',
@@ -69,7 +70,7 @@ const EnvSchema = z
     }
   });
 
-export type Env = z.infer<typeof EnvSchema> & { OTP_PEPPER: string };
+export type Env = z.infer<typeof EnvSchema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const parsed = EnvSchema.safeParse(source);
@@ -80,8 +81,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const env = parsed.data;
   return {
     ...env,
-    // Development fallback only; production requires an explicit pepper (checked above).
-    OTP_PEPPER: env.OTP_PEPPER ?? 'dev-only-otp-pepper-change-me',
     MANIFEST_ALLOW_PLACEHOLDER:
       env.NODE_ENV === 'production' ? false : env.MANIFEST_ALLOW_PLACEHOLDER,
   };

@@ -1,15 +1,18 @@
+import { createHash, randomBytes } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { shell } from 'electron';
 import {
   MeResponseSchema,
-  RequestOtpResponseSchema,
-  VerifyOtpResponseSchema,
+  SignInResponseSchema,
   type AttendeeProfile,
+  type SignInResponse,
 } from '@eventkit/shared';
 import type { AuthState } from '../common/ipc';
 import { api, ApiError } from './api';
-import { paths } from './config';
+import { config, paths } from './config';
 import { deviceInfo } from './device';
 import { errMsg, logger } from './logger';
+import { SignInError, startLoopback, type Loopback } from './loopback';
 import { secureStore } from './secure-store';
 import { readJson, writeJson } from './store';
 
@@ -27,6 +30,7 @@ class Auth extends EventEmitter {
     deviceId: null,
   });
   private lastError: string | undefined;
+  private pending: { loop: Loopback; url: string } | null = null;
 
   state(): AuthState {
     const signedIn = Boolean(secureStore.get('sessionToken')) && Boolean(this.stored.profile);
@@ -48,17 +52,49 @@ class Auth extends EventEmitter {
     this.emit('changed', this.state());
   }
 
-  async requestOtp(email: string) {
-    const res = await api.request('/auth/request-otp', RequestOtpResponseSchema, {
-      body: { email },
-    });
-    return { message: res.message };
+  /**
+   * "Sign in with Google" in the system browser (OAuth for native apps, RFC 8252):
+   * a one-shot loopback listener receives a one-time code from the event server, which
+   * is redeemed together with a PKCE verifier that never leaves this process.
+   */
+  async signInWithGoogle(): Promise<AuthState> {
+    this.cancelSignIn();
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const state = randomBytes(24).toString('base64url');
+    const loop = await startLoopback(state);
+    const url = `${config.apiBaseUrl}/auth/google/start?${new URLSearchParams({
+      port: String(loop.port),
+      challenge,
+      state,
+    }).toString()}`;
+    this.pending = { loop, url };
+    try {
+      await shell.openExternal(url);
+      const r = await loop.result;
+      if ('error' in r) throw new SignInError(r.error, r.message);
+      const res = await api.request('/auth/google/exchange', SignInResponseSchema, {
+        body: { code: r.code, verifier, device: deviceInfo() },
+      });
+      return this.completeSignIn(res);
+    } finally {
+      loop.close();
+      if (this.pending?.loop === loop) this.pending = null;
+    }
   }
 
-  async verifyOtp(email: string, code: string): Promise<AuthState> {
-    const res = await api.request('/auth/verify-otp', VerifyOtpResponseSchema, {
-      body: { email, code, device: deviceInfo() },
-    });
+  /** Abort a sign-in that is waiting for the browser. */
+  cancelSignIn() {
+    this.pending?.loop.close();
+    this.pending = null;
+  }
+
+  /** Re-open the browser for a sign-in that is still waiting (tab closed by mistake). */
+  async reopenSignIn() {
+    if (this.pending) await shell.openExternal(this.pending.url);
+  }
+
+  private completeSignIn(res: SignInResponse): AuthState {
     secureStore.set('sessionToken', res.token);
     secureStore.set('deviceKey', res.deviceKey);
     api.setOffset(res.serverTime - Date.now());

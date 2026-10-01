@@ -1,6 +1,5 @@
 import { app, clipboard, dialog, net, Notification, powerMonitor, session, shell } from 'electron';
 import { z } from 'zod';
-import { EmailSchema } from '@eventkit/shared';
 import type { AppInfo, Phase2View, QrView } from '../common/ipc';
 import { CHANNELS } from '../common/ipc';
 import { api } from './api';
@@ -180,19 +179,21 @@ function registerIpc() {
   );
 
   handle(CHANNELS.authState, null, () => auth.state());
-  handle(CHANNELS.requestOtp, z.object({ email: EmailSchema }), ({ email }) =>
-    auth.requestOtp(email),
-  );
-  handle(
-    CHANNELS.verifyOtp,
-    z.object({ email: EmailSchema, code: z.string().regex(/^\d{6}$/) }),
-    async ({ email, code }) => {
-      const state = await auth.verifyOtp(email, code);
-      void engine.prepare();
-      setAutoLaunch(true);
-      return state;
-    },
-  );
+  handle(CHANNELS.signInWithGoogle, null, async () => {
+    const state = await auth.signInWithGoogle();
+    // The browser had focus; bring the app back to the front.
+    const win = getMainWindow();
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+    void engine.prepare();
+    setAutoLaunch(true);
+    return state;
+  });
+  handle(CHANNELS.cancelSignIn, null, () => auth.cancelSignIn());
+  handle(CHANNELS.reopenSignIn, null, () => auth.reopenSignIn());
   handle(CHANNELS.signOut, null, async () => {
     await auth.signOut();
     setAutoLaunch(false);
