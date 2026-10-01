@@ -1,0 +1,58 @@
+{
+  "base_url": "https://storage.googleapis.com/flutter_infra_release/releases",
+  "current_release": {
+    "beta": "b0000000000000000000000000000000000000b1",
+    "dev": "d0000000000000000000000000000000000000d1",
+    "stable": "a0000000000000000000000000000000000000a2"
+  },
+  "releases": [
+    {
+      "hash": "b0000000000000000000000000000000000000b1",
+      "channel": "beta",
+      "version": "3.37.0-0.1.pre",
+      "dart_sdk_version": "3.10.0 (build 3.10.0-162.1.beta)",
+      "dart_sdk_arch": "arm64",
+      "release_date": "2025-09-20T10:00:00.000Z",
+      "archive": "beta/macos/flutter_macos_arm64_3.37.0-0.1.pre-beta.zip",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "hash": "a0000000000000000000000000000000000000a2",
+      "channel": "stable",
+      "version": "3.35.4",
+      "dart_sdk_version": "3.9.2",
+      "dart_sdk_arch": "x64",
+      "release_date": "2025-09-16T19:00:00.000Z",
+      "archive": "stable/macos/flutter_macos_3.35.4-stable.zip",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "hash": "a0000000000000000000000000000000000000a2",
+      "channel": "stable",
+      "version": "3.35.4",
+      "dart_sdk_version": "3.9.2",
+      "dart_sdk_arch": "arm64",
+      "release_date": "2025-09-16T19:00:00.000Z",
+      "archive": "stable/macos/flutter_macos_arm64_3.35.4-stable.zip",
+      "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    {
+      "hash": "a0000000000000000000000000000000000000a1",
+      "channel": "stable",
+      "version": "3.35.3",
+      "dart_sdk_version": "3.9.2",
+      "dart_sdk_arch": "arm64",
+      "release_date": "2025-09-02T19:00:00.000Z",
+      "archive": "stable/macos/flutter_macos_arm64_3.35.3-stable.zip",
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "hash": "a0000000000000000000000000000000000000a0",
+      "channel": "stable",
+      "version": "2.10.5",
+      "release_date": "2022-04-18T19:00:00.000Z",
+      "archive": "stable/macos/flutter_macos_2.10.5-stable.zip",
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ]
+}

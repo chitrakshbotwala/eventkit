@@ -1,0 +1,2 @@
+* text=auto eol=lf
+packages/shared/test/fixtures/** -text

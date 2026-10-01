@@ -1,0 +1,32 @@
+[✓] Flutter (Channel stable, 3.35.4, on macOS 15.6.1 24G90 darwin-arm64, locale en-GB) [612ms]
+    • Flutter version 3.35.4 on channel stable at /Users/dev/dev/toolchain/flutter
+    • Dart version 3.9.2
+
+[!] Android toolchain - develop for Android devices (Android SDK version 36.0.0) [1,902ms]
+    • Android SDK at /Users/dev/dev/toolchain/android-sdk
+    • Platform android-36, build-tools 36.0.0
+    • Java version OpenJDK Runtime Environment Temurin-17.0.16+8 (build 17.0.16+8)
+    ! Some Android licenses not accepted. To resolve this, run: flutter doctor
+      --android-licenses
+
+[✗] Xcode - develop for iOS and macOS [1,011ms]
+    ✗ Xcode installation is incomplete; a full installation is necessary for iOS and macOS development.
+      Download at: https://developer.apple.com/xcode/
+    ✗ CocoaPods not installed.
+
+[✓] Chrome - develop for the web [22ms]
+    • CHROME_EXECUTABLE = /Users/dev/Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+
+[!] Android Studio (not installed) [5ms]
+
+[!] VS Code (version 1.104.2) [8ms]
+    • VS Code at /Users/dev/Applications/Visual Studio Code.app/Contents
+    ! Flutter extension not installed; install from
+      https://marketplace.visualstudio.com/items?itemName=Dart-Code.flutter
+
+[✓] Connected device (1 available) [5.2s]
+
+[✓] Network resources [412ms]
+    • All expected network resources are available.
+
+! Doctor found issues in 4 categories.

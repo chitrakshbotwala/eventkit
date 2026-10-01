@@ -1,0 +1,286 @@
+// SQLite for development. For Postgres run `pnpm --filter @eventkit/server db:pg`,
+// which writes schema.postgres.prisma with the provider swapped.
+// Enums are plain strings and JSON is stored as String so the schema stays portable.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id         String       @id @default(cuid())
+  slug       String       @unique
+  name       String
+  timezone   String       @default("UTC")
+  createdAt  DateTime     @default(now())
+  attendees  Attendee[]
+  attendance Attendance[]
+  schedule   Schedule?
+}
+
+model Attendee {
+  id          String    @id @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Always lower-cased.
+  email       String
+  name        String
+  /// invited | logged_in | installing | ready | not_ready
+  status      String    @default("invited")
+  /// base64 per-attendee QR secret, issued only after an accepted readiness report.
+  qrSecret    String?
+  readyAt     DateTime?
+  lastSeenAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  sessions           Session[]
+  devices            Device[]
+  setupProgress      SetupProgress[]
+  readinessReports   ReadinessReport[]
+  attendance         Attendance?
+  connectivityEvents ConnectivityEvent[]
+  connectivityLogs   ConnectivityLog[]
+
+  @@unique([eventId, email])
+  @@index([eventId, status])
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  attendeeId String
+  attendee   Attendee  @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  deviceId   String
+  device     Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([attendeeId])
+}
+
+model Device {
+  id             String   @id @default(cuid())
+  attendeeId     String
+  attendee       Attendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  clientDeviceId String
+  /// base64 HMAC key for readiness reports and connectivity logs.
+  deviceKey      String
+  os             String
+  arch           String
+  osVersion      String
+  hostname       String?
+  appVersion     String
+  overallPercent Float?
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+
+  sessions           Session[]
+  setupProgress      SetupProgress[]
+  readinessReports   ReadinessReport[]
+  connectivityEvents ConnectivityEvent[]
+  connectivityLogs   ConnectivityLog[]
+
+  @@unique([attendeeId, clientDeviceId])
+}
+
+model SetupProgress {
+  id          String   @id @default(cuid())
+  attendeeId  String
+  attendee    Attendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  componentId String
+  status      String
+  step        String?
+  version     String?
+  percent     Float?
+  message     String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([deviceId, componentId])
+  @@index([attendeeId])
+}
+
+model ReadinessReport {
+  id         String   @id @default(cuid())
+  attendeeId String
+  attendee   Attendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  deviceId   String
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  accepted   Boolean
+  /// JSON string[]
+  reasons    String
+  /// JSON ReadinessReport
+  report     String
+  manifestId String
+  createdAt  DateTime @default(now())
+
+  @@index([attendeeId, createdAt])
+}
+
+model Attendance {
+  id          String     @id @default(cuid())
+  eventId     String
+  event       Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// One record per attendee: duplicate scans never create a second row.
+  attendeeId  String     @unique
+  attendee    Attendee   @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  checkedInAt DateTime   @default(now())
+  /// qr | manual
+  method      String
+  scannerId   String?
+  scanner     AdminUser? @relation(fields: [scannerId], references: [id], onDelete: SetNull)
+  reason      String?
+
+  @@index([eventId, checkedInAt])
+}
+
+model Schedule {
+  id               String    @id @default(cuid())
+  eventId          String    @unique
+  event            Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  version          Int       @default(1)
+  startAt          DateTime?
+  endAt            DateTime?
+  timezone         String    @default("UTC")
+  /// strict | lenient
+  mode             String    @default("strict")
+  graceSeconds     Int       @default(120)
+  heartbeatSeconds Int       @default(60)
+  preSyncMinutes   Int       @default(5)
+  updatedAt        DateTime  @updatedAt
+}
+
+model ConnectivityEvent {
+  id         String   @id @default(cuid())
+  attendeeId String
+  attendee   Attendee @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  deviceId   String
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  logId      String
+  seq        Int
+  type       String
+  /// Client wall time.
+  wallTime   DateTime
+  monoMs     Float
+  bootId     String
+  offsetMs   Int
+  /// JSON LogEntryData
+  data       String
+  prevHash   String
+  hash       String
+  hmac       String
+  /// realtime | uploaded_log
+  source     String
+  /// Entry-level HMAC verified on receipt.
+  valid      Boolean  @default(true)
+  receivedAt DateTime @default(now())
+
+  @@unique([deviceId, logId, seq])
+  @@index([attendeeId, wallTime])
+}
+
+model ConnectivityLog {
+  id              String    @id @default(cuid())
+  attendeeId      String
+  attendee        Attendee  @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  deviceId        String
+  device          Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  logId           String
+  scheduleVersion Int
+  entryCount      Int
+  lastSeq         Int?
+  firstEntryAt    DateTime?
+  lastEntryAt     DateTime?
+  chainValid      Boolean
+  /// JSON string[]
+  errors          String
+  /// JSON clock anomalies
+  clockAnomalies  String    @default("[]")
+  uploadedAt      DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([deviceId, logId])
+  @@index([attendeeId])
+}
+
+model AdminUser {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String
+  passwordHash String
+  /// superadmin | volunteer
+  role         String
+  totpSecret   String?
+  totpEnabled  Boolean        @default(false)
+  disabled     Boolean        @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime       @default(now())
+  sessions     AdminSession[]
+  attendance   Attendance[]
+}
+
+model AdminSession {
+  id        String    @id @default(cuid())
+  adminId   String
+  admin     AdminUser @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  ip        String?
+}
+
+/// One "Sign in with Google" attempt started by a desktop app (loopback redirect + PKCE).
+model SignInRequest {
+  id             String    @id @default(cuid())
+  /// sha256 of the OAuth `state` sent to Google.
+  stateHash      String    @unique
+  nonce          String
+  /// PKCE verifier for the server's own exchange with Google.
+  googleVerifier String
+  /// PKCE S256 challenge from the desktop app; its verifier redeems the one-time code.
+  appChallenge   String
+  /// Opaque value echoed back to the desktop app's loopback listener.
+  appState       String
+  redirectPort   Int
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+  attendeeId     String?
+  /// sha256 of the one-time code handed to the desktop app after Google confirmed the email.
+  codeHash       String?   @unique
+  codeExpiresAt  DateTime?
+  consumedAt     DateTime?
+  ip             String?
+
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  /// admin | attendee | system
+  actorType String
+  actorId   String?
+  actorLabel String?
+  action    String
+  target    String?
+  /// JSON
+  data      String   @default("{}")
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model Setting {
+  key       String   @id
+  /// JSON value
+  value     String
+  updatedAt DateTime @updatedAt
+}
