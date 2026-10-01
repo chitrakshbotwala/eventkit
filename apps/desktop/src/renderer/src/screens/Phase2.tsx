@@ -58,7 +58,9 @@ export function Phase2() {
                 `Starts ${new Date(p.startAt).toLocaleTimeString()}`}
               {active && p.endAt && `Ends ${new Date(p.endAt).toLocaleTimeString()}`}
               {p.state === 'ended' &&
-                'The offline phase has ended. Reconnect so your log can be uploaded.'}
+                (p.pendingUpload > 0
+                  ? 'The offline phase has ended. Reconnect so your log can be uploaded.'
+                  : 'The offline phase has ended and your log has been uploaded.')}
             </p>
           </div>
           <div className="text-right">

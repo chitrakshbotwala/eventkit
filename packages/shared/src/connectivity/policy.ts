@@ -58,6 +58,9 @@ const PRIORITY: ComplianceStatus[] = [
   'compliant',
 ];
 
+/** Gaps shorter than this are ignored. */
+export const MIN_GAP_MS = 60_000;
+
 /** Max silence between entries (while the app runs) before it counts as a gap. */
 export function gapThresholdMs(heartbeatSeconds: number): number {
   return heartbeatSeconds * 2000 + 30_000;
@@ -167,8 +170,11 @@ export function evaluateCompliance(input: ComplianceInput): ComplianceResult {
           : [{ from: e.time, to: Math.min(e.time + threshold, nextStop[i]!) }],
       ),
     );
-    mergedGaps = subtractIntervals({ from: w.startAt, to: evalEnd }, covered);
-    if (uploaded[0]!.time > w.startAt) notes.push('monitor was not running at phase start');
+    // Sub-minute gaps are noise (clients learn about "Start now" on their next sync).
+    mergedGaps = subtractIntervals({ from: w.startAt, to: evalEnd }, covered).filter(
+      (g) => g.to - g.from >= MIN_GAP_MS,
+    );
+    if (uploaded[0]!.time > w.startAt + MIN_GAP_MS) notes.push('monitor was not running at phase start');
   }
 
   const coversWindow = uploaded.some((e) => e.time >= w.endAt - threshold);

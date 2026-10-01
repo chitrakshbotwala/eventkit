@@ -214,6 +214,20 @@ describe('evaluateCompliance', () => {
     expect(r.gapSeconds).toBe(10 * 60 - 150);
   });
 
+  it('ignores sub-minute gaps (monitor started a few seconds late)', () => {
+    const entries = [e(0.5, 'app_start', 'offline'), ...heartbeats(1, 60)];
+    const r = evaluateCompliance({
+      window: win(),
+      entries,
+      logVerified: true,
+      tampered: false,
+      now: after,
+    });
+    expect(r.gaps).toEqual([]);
+    expect(r.status).toBe('compliant');
+    expect(r.notes.join()).not.toMatch(/not running at phase start/);
+  });
+
   it('unverified: no uploaded log, or log not covering the end', () => {
     const none = evaluateCompliance({
       window: win(),

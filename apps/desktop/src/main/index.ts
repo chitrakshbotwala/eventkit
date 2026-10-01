@@ -1,4 +1,4 @@
-import { app, clipboard, net, session, shell } from 'electron';
+import { app, clipboard, dialog, net, Notification, powerMonitor, session, shell } from 'electron';
 import { z } from 'zod';
 import { EmailSchema } from '@eventkit/shared';
 import type { AppInfo, Phase2View, QrView } from '../common/ipc';
@@ -21,7 +21,9 @@ import { SetupEngine } from './setup/engine';
 import { persistPosix, persistWindows } from './setup/env-persist';
 import { run } from './setup/exec';
 import { simulatedDownloader, simulatedRunners } from './setup/simulate';
-import { createTray } from './tray';
+import { setAutoLaunch } from './autolaunch';
+import { Phase2Controller } from './phase2/controller';
+import { createTray, setTrayStatus } from './tray';
 import { createMainWindow, getMainWindow, hardenApp } from './window';
 import { homedir } from 'node:os';
 import { flutterBin } from './setup/paths';
@@ -78,6 +80,47 @@ const engine = new SetupEngine({
     void pushQr();
   },
 });
+
+const phase2 = new Phase2Controller({
+  probe: { fetch: (url, init) => net.fetch(url, init), serverUrl: config.apiBaseUrl },
+  onView: (view) => {
+    send('phase2:changed', view);
+    updateTray(view);
+  },
+  onDisconnectNow: () => {
+    const win = getMainWindow() ?? createMainWindow({ show: true });
+    win.show();
+    win.focus();
+    if (Notification.isSupported()) {
+      new Notification({
+        title: 'Offline phase started: disconnect now',
+        body: 'Turn off Wi-Fi and unplug Ethernet. Time online is being recorded.',
+        urgency: 'critical',
+      }).show();
+    }
+  },
+  projectDir: () => engine.facts.projectDir ?? null,
+});
+
+let lastTray = '';
+function updateTray(v: Phase2View) {
+  let state: 'idle' | 'ok' | 'warn' | 'bad' = 'idle';
+  let line = 'EventKit';
+  if (v.state === 'active') {
+    state = v.net === 'online' ? 'bad' : v.net === 'limited' && v.mode === 'strict' ? 'warn' : 'ok';
+    line = v.net === 'online' ? 'Offline phase: ONLINE, disconnect now' : 'Offline phase: monitoring';
+  } else if (v.state === 'presync') {
+    line = v.safeToDisconnect ? 'Offline phase soon: safe to disconnect' : 'Offline phase soon: syncing';
+  } else if (v.state === 'ended' && v.pendingUpload > 0) {
+    state = 'warn';
+    line = 'Offline phase ended: reconnect to upload the log';
+  }
+  const key = `${state}|${line}`;
+  if (key !== lastTray) {
+    lastTray = key;
+    setTrayStatus(state, line);
+  }
+}
 
 const reporter = new ProgressReporter();
 engine.on('snapshot', (s) => {
@@ -139,10 +182,14 @@ function registerIpc() {
     async ({ email, code }) => {
       const state = await auth.verifyOtp(email, code);
       void engine.prepare();
+      setAutoLaunch(true);
       return state;
     },
   );
-  handle(CHANNELS.signOut, null, () => auth.signOut());
+  handle(CHANNELS.signOut, null, async () => {
+    await auth.signOut();
+    setAutoLaunch(false);
+  });
   handle(CHANNELS.authRefresh, null, () => auth.refresh());
 
   handle(CHANNELS.setupSnapshot, null, () => engine.snapshot());
@@ -166,8 +213,8 @@ function registerIpc() {
   });
 
   handle(CHANNELS.qrCurrent, null, (): Promise<QrView> => currentQr(engine));
-  handle(CHANNELS.phase2State, null, (): Phase2View => idlePhase2());
-  handle(CHANNELS.phase2Sync, null, () => undefined);
+  handle(CHANNELS.phase2State, null, (): Phase2View => phase2.view());
+  handle(CHANNELS.phase2Sync, null, () => phase2.syncNow());
 
   handle(CHANNELS.openVsCode, null, async () => {
     const cli = engine.facts.vscodeCli;
@@ -198,28 +245,6 @@ function registerIpc() {
   handle(CHANNELS.logsOpenFolder, null, async () => {
     await shell.openPath(paths.logs());
   });
-}
-
-function idlePhase2(): Phase2View {
-  return {
-    state: 'none',
-    startAt: null,
-    endAt: null,
-    mode: 'strict',
-    graceSeconds: 0,
-    msToStart: null,
-    msToEnd: null,
-    net: 'offline',
-    interfaces: [],
-    lastCheckAt: null,
-    compliance: 'pending',
-    violationCount: 0,
-    onlineSeconds: 0,
-    pendingUpload: 0,
-    lastSyncAt: null,
-    safeToDisconnect: false,
-    projectDir: engine.facts.projectDir ?? null,
-  };
 }
 
 function diagnostics(): string {
@@ -276,8 +301,11 @@ app
     createMainWindow({ show: !config.startHidden });
     createTray({
       show: () => (getMainWindow() ?? createMainWindow({ show: true })).show(),
-      quit: () => app.quit(),
+      quit: () => void requestQuit(),
     });
+    powerMonitor.on('suspend', () => phase2.onSuspend());
+    powerMonitor.on('resume', () => phase2.onResume());
+    phase2.start();
 
     scheduleQrTick();
     if (auth.state().signedIn) {
@@ -301,4 +329,38 @@ app
 
 app.on('window-all-closed', () => {
   // Stay alive in the tray (needed for phase-2 monitoring); quit via tray menu.
+});
+
+let quitting = false;
+/** Quitting during the offline phase is allowed but recorded; confirm first. */
+async function requestQuit() {
+  if (phase2.isActive) {
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['Keep running', 'Quit anyway'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Offline phase in progress',
+      message: 'EventKit is monitoring the offline phase.',
+      detail: 'If you quit, the time until you restart it is recorded as a monitoring gap.',
+    });
+    if (response !== 1) return;
+  }
+  quitting = true;
+  app.quit();
+}
+
+app.on('before-quit', () => {
+  quitting = true;
+  phase2.recordAppStop();
+  phase2.stop();
+});
+
+app.on('browser-window-created', (_e, win) => {
+  // Closing the window hides it to the tray; the monitor keeps running.
+  win.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    win.hide();
+  });
 });

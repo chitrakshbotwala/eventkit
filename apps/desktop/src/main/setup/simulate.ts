@@ -6,6 +6,7 @@ import {
   parseFlutterDoctor,
   evaluateDoctor,
 } from '@eventkit/shared';
+import { join } from 'node:path';
 import type { DownloaderLike } from './engine';
 import type { DownloadProgress, DownloadRequest } from './downloader';
 import { COMPONENT_WEIGHTS, dependsOnFor } from './components/meta';
@@ -175,7 +176,7 @@ export function simulatedRunners(opts: SimulateOptions): Partial<Record<Componen
           });
         }
         ctx.facts.simulated = { ...ctx.facts.simulated, [c.id]: versionOf(c) ?? '' };
-        if (c.id === 'warmup') ctx.facts.projectDir = `${ctx.dirs.projects}/starter_app`;
+        if (c.id === 'warmup') ctx.facts.projectDir = join(ctx.dirs.projects, 'starter_app');
         ctx.save();
       },
       async verify(c, ctx) {

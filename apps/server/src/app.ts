@@ -13,6 +13,8 @@ import { attendeeAuthRoutes } from './routes/auth';
 import { apiRoutes } from './routes/api';
 import { adminAuthRoutes } from './routes/admin/auth';
 import { adminAttendanceRoutes } from './routes/admin/attendance';
+import { adminMonitoringRoutes } from './routes/admin/monitoring';
+import { connectivityRoutes } from './routes/connectivity';
 import { adminAttendeeRoutes } from './routes/admin/attendees';
 import { adminScheduleRoutes } from './routes/admin/schedule';
 import { adminSettingsRoutes } from './routes/admin/settings';
@@ -116,6 +118,8 @@ export async function buildApp(opts: BuildOptions): Promise<FastifyInstance> {
   await app.register(adminAuthRoutes);
   await app.register(adminAttendeeRoutes);
   await app.register(adminAttendanceRoutes);
+  await app.register(adminMonitoringRoutes);
+  await app.register(connectivityRoutes);
   await app.register(adminScheduleRoutes);
   await app.register(adminSettingsRoutes);
   await app.register(adminUserRoutes);

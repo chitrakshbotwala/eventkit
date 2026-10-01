@@ -107,6 +107,16 @@ export async function computeCompliance(
       state: jsonParse<{ state?: NetState }>(e.data, {}).state,
       source: e.source as PolicyEntry['source'],
     }));
+    // Clock jumps detected server-side (wall vs monotonic) count like logged clock anomalies.
+    const serverAnomalies: string[] = [];
+    for (const l of aLogs) {
+      for (const an of jsonParse<Array<{ seq: number; reason: string }>>(l.clockAnomalies, [])) {
+        const at = entries.find((x) => x.logId === l.logId && x.seq === an.seq);
+        if (!at) continue;
+        entries.push({ ...at, seq: at.seq + 0.5, type: 'clock_anomaly', state: undefined });
+        serverAnomalies.push(an.reason);
+      }
+    }
     const tampered = evs.some((e) => !e.valid) || aLogs.some((l) => !l.chainValid);
     const logVerified = aLogs.some(
       (l) => l.chainValid && l.lastEntryAt && l.lastEntryAt.getTime() >= endAt - threshold,
@@ -127,6 +137,7 @@ export async function computeCompliance(
     const notes = [...r.notes];
     for (const l of aLogs)
       if (!l.chainValid) notes.push(...jsonParse<string[]>(l.errors, []).slice(0, 3));
+    if (serverAnomalies.length) notes.push(`clock: ${serverAnomalies[0]}`);
     if (a.devices.length > 1) notes.push(`${a.devices.length} devices`);
     return {
       attendeeId: a.id,

@@ -4,6 +4,7 @@ Decisions taken without asking. Each one is small and can be reversed.
 
 ## General
 
+- **Volunteers** (role `volunteer`) can only use the scanner. They can look up attendees by name or email but cannot do manual check-ins. Only superadmins can, and every manual check-in needs a reason, which is audit-logged.
 - **One event per deployment.** There is an `Event` table, but the server works on the single event named by `EVENT_SLUG`. For multi-tenant use, scope the queries by event id (the columns already exist).
 - **Working names.** The product is called "EventKit" (`@eventkit/*` packages). Change `productName` and `appId` in `apps/desktop/electron-builder.yml` to rebrand it.
 - **Pinned toolchain versions.** TypeScript 5.9, Vite 7, Vitest 3.2, Prisma 6, Fastify 5, Zod 4, React 19, React Router 7, Tailwind 4, Electron 44, electron-vite 5, and electron-builder 26. We picked these over newer majors because the typescript-eslint, electron-vite and Prisma 7 driver-adapter changes are compatible with them.
@@ -55,7 +56,11 @@ Decisions taken without asking. Each one is small and can be reversed.
   - `hash` = sha256 of the canonical entry
   - `hmac` = HMAC(deviceKey, hash)
 - Event types are the spec's set plus `limited` (an interface is up but there is no internet), `suspend`/`resume` (powerMonitor) and `phase_start`/`phase_end`. When the wall clock jumps forward and the monotonic clock does not, and there is no suspend event, we record a `clock_anomaly`. Suspend time is reported as a gap, not as tampering.
-- A probe counts as "internet reachable" if ANY HTTP response comes back from ANY probe endpoint, including captive-portal redirects, or if a TCP handshake to a public IP succeeds. Virtual adapters (WSL, Hyper-V, Docker, VirtualBox, VMware, loopback, link-local) do not count toward "interface up".
+- A probe counts as "internet reachable" if ANY HTTP response comes back from ANY probe endpoint, including captive-portal redirects, or if a TCP handshake to a public IP succeeds. Virtual adapters (WSL, Hyper-V, Docker, VirtualBox, VMware, loopback, link-local) do not count toward "interface up". VPN adapters (WARP, WireGuard, OpenVPN, Tailscale and similar) are ignored too. They only carry traffic when a physical link is up, and that link is what gets judged.
+- **A LAN-only event server is not "internet".** If the server URL is a private or loopback host, reaching it does not count as online. This means a venue that hosts the server on its LAN can keep it reachable during phase 2. A public server URL does count as internet.
+- **Gaps under 60 s are ignored.** Clients learn about "Start now" on their next schedule sync, which happens every minute, so a few seconds of no coverage at phase start (or around a restart) is not reported as a monitoring gap.
+- **Online at grace end.** If a laptop is still online when the grace period ends, it writes an extra heartbeat at that moment. The violation then appears immediately instead of at the next regular heartbeat.
+- **Ingest is serialized per device.** The realtime flush and the full-log upload can race, so they are serialized per device with an in-process lock (the server is a single instance, see Deployment).
 - **Status priority:** tampered > violation > monitoring_gap > unverified > warning > compliant. A live violation is final even before the log is uploaded. "Compliant" requires a verified uploaded log that covers the whole window.
 - **Auto-launch** uses `setLoginItemSettings` on Windows and macOS and an XDG autostart `.desktop` file on Linux. It is registered after login. During phase 2, closing the window hides the app to the tray.
 
