@@ -150,6 +150,31 @@ describe('RSVP import', () => {
     expect(json<{ total: number }>(list).total).toBe(1);
   });
 
+  it('changes an RSVP email to the Google account email, refusing duplicates', async () => {
+    const { cookie } = await loginAdmin(t, 'root@example.org');
+    const event = await t.app.ctx.event();
+    const asha = await t.prisma.attendee.create({
+      data: { eventId: event.id, email: 'asha@work.example', name: 'Asha' },
+    });
+    await t.prisma.attendee.create({
+      data: { eventId: event.id, email: 'ben@example.com', name: 'Ben' },
+    });
+    const patch = (email: string) =>
+      t.app.inject({
+        method: 'PATCH',
+        url: `/admin/attendees/${asha.id}`,
+        headers: adminHeaders(cookie),
+        payload: { email },
+      });
+    expect((await patch('Asha.Rao@Gmail.com')).statusCode).toBe(200);
+    expect((await t.prisma.attendee.findUniqueOrThrow({ where: { id: asha.id } })).email).toBe(
+      'asha.rao@gmail.com',
+    );
+    const dup = await patch('ben@example.com');
+    expect(dup.statusCode).toBe(409);
+    expect(json(dup).error).toBe('email_taken');
+  });
+
   it('handles header-less files and BOMs', async () => {
     const { cookie } = await loginAdmin(t, 'root@example.org');
     const res = await t.app.inject({

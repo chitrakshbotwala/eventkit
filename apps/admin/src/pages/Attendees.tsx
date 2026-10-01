@@ -375,6 +375,7 @@ function AttendeeDrawer({ id, onClose }: { id: string | null; onClose: () => voi
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ['attendee', id] });
     void qc.invalidateQueries({ queryKey: ['attendees'] });
@@ -389,7 +390,12 @@ function AttendeeDrawer({ id, onClose }: { id: string | null; onClose: () => voi
     },
   });
   const rename = useMutation({
-    mutationFn: () => api.updateAttendee(id!, { name: name.trim() }),
+    mutationFn: () => {
+      const patch: { name?: string; email?: string } = { name: name.trim() };
+      // Changing the email to the attendee's Google address fixes "not on the RSVP list".
+      if (email.trim().toLowerCase() !== d.data?.attendee.email) patch.email = email.trim();
+      return api.updateAttendee(id!, patch);
+    },
     onSuccess: () => {
       setEditing(false);
       invalidate();
@@ -436,12 +442,19 @@ function AttendeeDrawer({ id, onClose }: { id: string | null; onClose: () => voi
                     aria-label="Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-56"
+                    className="w-48"
+                  />
+                  <Input
+                    aria-label="Email (must match their Google account)"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-64"
                   />
                   <Button
                     size="sm"
                     variant="primary"
-                    disabled={!name.trim() || rename.isPending}
+                    disabled={!name.trim() || !email.trim() || rename.isPending}
                     onClick={() => rename.mutate()}
                   >
                     Save
@@ -455,10 +468,11 @@ function AttendeeDrawer({ id, onClose }: { id: string | null; onClose: () => voi
                   size="sm"
                   onClick={() => {
                     setName(data.attendee.name);
+                    setEmail(data.attendee.email);
                     setEditing(true);
                   }}
                 >
-                  Edit name
+                  Edit name / email
                 </Button>
               )}
               <Button
