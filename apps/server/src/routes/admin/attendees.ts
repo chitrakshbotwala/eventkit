@@ -231,7 +231,12 @@ export async function adminAttendeeRoutes(app: FastifyInstance) {
       const body = parse(AttendeeUpsertBodySchema.partial(), req.body);
       const a = await ctx.prisma.attendee
         .update({ where: { id: req.params.id }, data: body })
-        .catch(() => null);
+        .catch((err: unknown) => {
+          if ((err as { code?: string }).code === 'P2002') {
+            throw conflict('email_taken', 'Another attendee already uses this email');
+          }
+          return null;
+        });
       if (!a) throw notFound('Attendee not found');
       await audit(ctx.prisma, {
         actorType: 'admin',
