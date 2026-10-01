@@ -61,6 +61,15 @@ const sourceSha = git(['rev-parse', '--verify', `${source}^{commit}`]);
 const short = sourceSha.slice(0, 7);
 const tmp = mkdtempSync(join(tmpdir(), 'ek-split-'));
 
+// Build on top of the published branch heads, so every push is a fast-forward.
+if (push) {
+  tryGit([
+    'fetch',
+    remote,
+    ...TARGETS.map((t) => `+refs/heads/${t.branch}:refs/remotes/${remote}/${t.branch}`),
+  ]);
+}
+
 try {
   for (const t of TARGETS) {
     const env = { ...process.env, GIT_INDEX_FILE: join(tmp, `${t.branch}.index`) };
@@ -72,9 +81,9 @@ try {
     g(['update-index', '--add', '--cacheinfo', `100644,${blob},BRANCH.md`]);
     const tree = g(['write-tree']);
 
-    const parent =
-      tryGit(['rev-parse', '--verify', `refs/heads/${t.branch}`]) ??
-      tryGit(['rev-parse', '--verify', `refs/remotes/${remote}/${t.branch}`]);
+    const published = tryGit(['rev-parse', '--verify', `refs/remotes/${remote}/${t.branch}`]);
+    const parent = published ?? tryGit(['rev-parse', '--verify', `refs/heads/${t.branch}`]);
+    let head = parent;
     if (parent && git(['rev-parse', `${parent}^{tree}`]) === tree) {
       console.log(`${t.branch}: up to date`);
     } else {
@@ -85,11 +94,13 @@ try {
         '-m',
         `Sync ${t.branch} from ${label}@${short}`,
       ]);
-      git(['update-ref', `refs/heads/${t.branch}`, commit, ...(parent ? [parent] : [])]);
+      head = commit;
       console.log(`${t.branch}: ${commit.slice(0, 7)} (from ${label}@${short})`);
     }
-    if (push)
-      git(['push', remote, `refs/heads/${t.branch}:refs/heads/${t.branch}`], { stdio: 'inherit' });
+    if (head) git(['update-ref', `refs/heads/${t.branch}`, head]);
+    if (push && head && head !== published) {
+      git(['push', remote, `${head}:refs/heads/${t.branch}`], { stdio: 'inherit' });
+    }
   }
 } finally {
   rmSync(tmp, { recursive: true, force: true });
