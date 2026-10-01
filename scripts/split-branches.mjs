@@ -43,12 +43,15 @@ const TARGETS = [
   },
 ];
 
+// execFileSync returns null when stdout is inherited (e.g. for `git push`).
 const git = (args, opts = {}) =>
-  execFileSync('git', args, {
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'inherit'],
-    ...opts,
-  }).trim();
+  (
+    execFileSync('git', args, {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'inherit'],
+      ...opts,
+    }) ?? ''
+  ).trim();
 const tryGit = (args) => {
   try {
     return git(args, { stdio: ['pipe', 'pipe', 'ignore'] });
