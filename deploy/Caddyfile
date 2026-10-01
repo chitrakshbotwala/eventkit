@@ -1,0 +1,11 @@
+# /etc/caddy/Caddyfile: HTTPS (automatic Let's Encrypt certificate) in front of EventKit.
+# Replace the hostname with yours; its DNS A/AAAA record must point at this VPS.
+event.example.org {
+	encode zstd gzip
+	# Large starter-project uploads from the admin site.
+	request_body {
+		max_size 250MB
+	}
+	# Server-sent events (live dashboard) are streamed; Caddy flushes them immediately.
+	reverse_proxy 127.0.0.1:8080
+}

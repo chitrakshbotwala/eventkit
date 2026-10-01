@@ -14,12 +14,15 @@ Decisions taken without asking. Each one is small and can be reversed.
 ## Auth
 
 - **Attendee sessions** use opaque 256-bit tokens. Only their SHA-256 hash is stored (the `Session` table was added). They expire after 30 days, and the desktop app keeps the token encrypted with `safeStorage`.
-- **OTP.** 6 digits, stored as an HMAC-SHA256 with a server pepper, 10 minute expiry, 5 attempts. A new request invalidates the previous code. Limits are 3 requests per email per 10 minutes plus a 30 s cooldown. Per-IP limits are deliberately generous, because the whole venue sits behind one NAT IP.
+- **Attendee sign-in is "Sign in with Google", replacing emailed one-time codes.** The organizers do not want to send email or read codes aloud. The desktop app opens the system browser (RFC 8252: no embedded webview). The server runs Google's authorization-code flow with PKCE and a nonce, and the client secret never leaves the server. Google's **verified** email is then matched, case-insensitively, against the RSVP list.
+- **Handing the session to the app.** The server redirects the browser to `http://127.0.0.1:<port>/callback`, where the app runs a one-shot listener. It sends a one-time code (2 minutes, single use, stored as a hash). The app redeems the code together with the PKCE verifier from its own challenge, so a code seen by another local process or a browser extension is useless. A sign-in left unfinished in the browser expires after 10 minutes.
+- **RSVP email ≠ Google email** is the main failure. The app shows "x is not on the RSVP list", and the help desk fixes it by editing the attendee's email. Alias emails are not modelled. The audit log keeps only the domain of rejected accounts.
+- **Development without Google credentials.** If `GOOGLE_CLIENT_ID` is unset and `NODE_ENV` is not production, a local page that accepts any email stands in for Google. Production refuses to start without the client.
 - **Admins** log in with a cookie session (httpOnly, SameSite=Strict, Secure in prod) and an argon2id password hash (`@node-rs/argon2`, which ships prebuilt binaries and needs no node-gyp). TOTP is RFC 6238 (SHA-1, 6 digits, 30 s) so it works with any authenticator app. Mutating admin requests must send a matching `Origin`. The first superadmin comes from `SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` via the seed, or from `pnpm --filter @eventkit/server admin:create`.
 
 ## Device key, readiness and QR
 
-- On OTP verify, the client sends a random `clientDeviceId`. The server returns a server-generated 256-bit **device key**, which stays stable per (attendee, device). The device key HMAC-signs readiness reports and every connectivity log entry.
+- On sign-in, the client sends a random `clientDeviceId`. The server returns a server-generated 256-bit **device key**, which stays stable per (attendee, device). The device key HMAC-signs readiness reports and every connectivity log entry.
 - **Readiness report** = canonical JSON plus HMAC(deviceKey). The server re-checks it against the current manifest: every enabled required component is verified, versions meet the minimums, Flutter equals the pinned version if one is set, and the required doctor categories pass. Only then does it set `status=ready` and return the per-attendee **QR secret**. The secret is generated once per attendee and reused across that attendee's devices. A later failing report sets the attendee back to `not_ready`, and scans are then refused.
 - **QR payload** is `EK1.<attendeeId>.<window>.<code>`, where `window = floor((now + serverOffset) / 60 s)` and `code` = 8-digit dynamic truncation of HMAC-SHA256(secret, window). The server accepts window ±1. If the window is further off but the HMAC is valid, the result is `expired`. Otherwise it is `invalid`. The window is included so the server can tell "expired" apart from "forged".
 - **Android licence consent** is shown as a notice next to the single "Set up my laptop" button. Clicking the button counts as acceptance, so there are no extra prompts mid-setup. If the admin disables the Android component, the notice is hidden.
@@ -69,6 +72,11 @@ Decisions taken without asking. Each one is small and can be reversed.
 - **Installers.** Windows gets one NSIS one-click installer: per-user, no UAC, **x64 only**. Windows on Arm runs it, and the x64 toolchain it installs, under emulation, and a dual-arch installer would double the download. macOS gets a dmg plus a zip for each of arm64 and x64. Linux gets an AppImage and a deb.
 - **Updates come from the event server**, not GitHub. The app points electron-updater at `<server>/updates/` at runtime, so the update feed is the same HTTPS origin the app already trusts. No public release hosting is needed, and organizers decide when an update goes live by copying files. The deb package does not self-update. Updates are never checked during phase 2.
 - **Electron fuses** are flipped at package time: no `RunAsNode`, no `NODE_OPTIONS`, no `--inspect`, and asar integrity validation is on. Chromium's `--remote-debugging-port` cannot be disabled this way, which is one more reason client attestation is evidence rather than proof (see README).
+
+## Repository branches
+
+- `main` holds everything. The `server` branch (shared + server + admin + deploy files) and the `desktop` branch (shared + Electron app + release workflow) are generated from it by `scripts/split-branches.mjs`. The `Sync deploy branches` workflow runs the script after CI passes. We chose this over separate repositories so the shared package and the API contract never drift. Each sync is a normal commit on top of the branch's previous head, so a VPS that cloned `server` can `git pull --ff-only`.
+- The deploy branches keep the full pnpm lockfile. pnpm installs only the workspace packages that exist, so the lockfile stays valid.
 
 ## Not attempted
 

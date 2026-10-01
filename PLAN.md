@@ -5,7 +5,7 @@ Monorepo (pnpm workspaces, TypeScript everywhere). Build order follows the spec 
 | #   | Milestone       | Key deliverables                                                                                                                                                                                                                                      |
 | --- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Scaffold        | pnpm workspace, tsconfig/eslint/prettier/vitest, `packages/shared` (Zod schemas, types, canonical JSON, Ed25519 manifest signing, rotating QR code, hash chain, compliance policy, Flutter release parser, doctor parser), Prisma schema, seed script |
-| 2   | Server core     | Fastify app factory, env config, attendee OTP auth, admin password + TOTP auth, RSVP CSV import, schedule, manifest builder + signing, time endpoint, rate limits, audit log                                                                          |
+| 2   | Server core     | Fastify app factory, env config, attendee Google sign-in (originally email OTP, replaced at the organizers' request), admin password + TOTP auth, RSVP CSV import, schedule, manifest builder + signing, time endpoint, rate limits, audit log        |
 | 3   | Desktop shell   | electron-vite app, secure preload API, safeStorage session, login screens, setup UI, setup engine (state machine, persisted state, downloader) running in `--simulate` mode                                                                           |
 | 4   | Real installers | Component implementations per OS (Windows → Linux → macOS), env/PATH persistence, `flutter doctor -v` gating                                                                                                                                          |
 | 5   | Readiness + QR  | Signed readiness report, server gate issuing per-attendee secret, local rotating QR, `/admin/scan` with idempotent check-in                                                                                                                           |
@@ -17,7 +17,7 @@ Monorepo (pnpm workspaces, TypeScript everywhere). Build order follows the spec 
 
 ```
  ┌──────────────── attendee laptop ────────────────┐        ┌──────────── server (Fastify) ───────────┐
- │ Electron main                                   │ HTTPS  │ /auth/*       OTP login                 │
+ │ Electron main                                   │ HTTPS  │ /auth/google/* Google sign-in (PKCE)    │
  │  ├ api client (net.fetch, system proxy)  ───────┼───────►│ /api/manifest signed Ed25519            │
  │  ├ setup engine (state machine, resumable)      │        │ /api/progress /api/readiness (gate)     │
  │  │   └ components: system,git,flutter,java,     │        │ /api/schedule /api/time                 │

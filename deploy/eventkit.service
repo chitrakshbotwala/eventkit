@@ -1,0 +1,32 @@
+# /etc/systemd/system/eventkit.service
+[Unit]
+Description=EventKit server (API + admin site)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eventkit
+Group=eventkit
+WorkingDirectory=/opt/eventkit/apps/server
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=3
+
+# Hardening: read-only system, writable state only under /var/lib/eventkit.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths=/var/lib/eventkit
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

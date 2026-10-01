@@ -2,8 +2,8 @@
 
 EventKit runs a hands-on Flutter workshop from start to finish.
 
-1. **Desktop app** (Electron, Windows / macOS / Linux). Attendees sign in with an emailed one-time code. A single click then installs and verifies the whole Flutter toolchain: Git, the Flutter SDK, Java 17, the Android SDK, Chrome, and VS Code with the Flutter extensions. Once the server accepts the laptop's readiness report, the app shows a rotating attendance QR code. During the offline phase it records connectivity in a tamper-evident log.
-2. **Server** (Fastify + Prisma). It handles OTP auth, the signed toolchain manifest, the readiness gate, idempotent check-in, the phase-2 schedule, and log verification with compliance scoring. It also serves the admin site, the LAN mirror and desktop updates.
+1. **Desktop app** (Electron, Windows / macOS / Linux). Attendees sign in with their Google account (it must match their RSVP email). A single click then installs and verifies the whole Flutter toolchain: Git, the Flutter SDK, Java 17, the Android SDK, Chrome, and VS Code with the Flutter extensions. Once the server accepts the laptop's readiness report, the app shows a rotating attendance QR code. During the offline phase it records connectivity in a tamper-evident log.
+2. **Server** (Fastify + Prisma). It handles Google sign-in against the RSVP list, the signed toolchain manifest, the readiness gate, idempotent check-in, the phase-2 schedule, and log verification with compliance scoring. It also serves the admin site, the LAN mirror and desktop updates.
 3. **Admin site** (React). It has these pages:
    - Live overview
    - Attendees and RSVP import
@@ -15,7 +15,7 @@ EventKit runs a hands-on Flutter workshop from start to finish.
 
 ```
  ┌──────────── attendee laptop ────────────┐  HTTPS   ┌──────────── server (Fastify) ────────────┐
- │ Electron main (sandboxed renderer)      │ ───────► │ /auth/*        OTP login                 │
+ │ Electron main (sandboxed renderer)      │ ───────► │ /auth/google/* Google sign-in (PKCE)     │
  │  ├ setup engine: detect → download →    │          │ /api/manifest  Ed25519-signed manifest   │
  │  │   install → verify (resumable)       │          │ /api/readiness gate → per-attendee secret│
  │  ├ readiness report (HMAC device key)   │          │ /api/connectivity/{events,log}           │
@@ -28,7 +28,7 @@ EventKit runs a hands-on Flutter workshop from start to finish.
  └─────────────────────────────────────────────────┘
 ```
 
-Design notes are in [PLAN.md](PLAN.md). Every decision the spec left open is listed in [ASSUMPTIONS.md](ASSUMPTIONS.md).
+A plain-language walkthrough is in [HOW_IT_WORKS.md](HOW_IT_WORKS.md). Design notes are in [PLAN.md](PLAN.md). Every decision the spec left open is listed in [ASSUMPTIONS.md](ASSUMPTIONS.md).
 
 ## Quick start (development)
 
@@ -36,12 +36,12 @@ You need Node.js 22.12+ and pnpm 10 (`corepack enable` provides pnpm).
 
 ```sh
 pnpm install
-pnpm setup          # copies .env files, generates signing keys + OTP pepper, creates and seeds the SQLite DB
+pnpm setup          # copies .env files, generates the manifest signing keys, creates and seeds the SQLite DB
 pnpm dev:simulate   # server :8080, admin site :5173, desktop app in simulate mode
 ```
 
 - **Admin site.** Open http://localhost:5173. Sign in as `admin@example.org` / `change-me-please-now` (superadmin) or `volunteer@example.org` / `volunteer-dev-password` (scanner only).
-- **Desktop app.** Sign in as `dev@example.com` or any seeded RSVP. Without SMTP configured, the OTP is printed in the server console.
+- **Desktop app.** Click **Continue with Google**. Without `GOOGLE_CLIENT_ID`, the browser shows a development page instead of Google: pick `dev@example.com` or any seeded RSVP.
 - **Simulate mode.** Installs are faked with realistic timing, so you can run the whole flow on your own machine without touching your toolchain. The flow is: setup, then readiness, then the QR, then scanning in the admin, then phase 2. Optional flags:
   - `--simulate-fail=flutter:download,android:install` injects failures.
   - `--simulate-flaky` drops each download once mid-way, so you can watch it resume.
@@ -55,11 +55,12 @@ pnpm dev:simulate   # server :8080, admin site :5173, desktop app in simulate mo
 | `pnpm test`                                       | Unit and integration tests (Vitest)               |
 | `pnpm lint` / `pnpm typecheck` / `pnpm format`    | ESLint, `tsc`, Prettier                           |
 | `pnpm build`                                      | Build shared, server, admin and desktop           |
-| `pnpm keys:gen`                                   | New Ed25519 manifest key pair and OTP pepper      |
+| `pnpm keys:gen`                                   | New Ed25519 manifest key pair                     |
 | `pnpm --filter @eventkit/server admin:create`     | Create or reset an admin user                     |
 | `pnpm --filter @eventkit/server manifest:resolve` | Resolve upstream versions and hashes from the CLI |
 | `pnpm --filter @eventkit/server mirror:sync`      | Download every manifest artifact into the mirror  |
 | `pnpm --filter @eventkit/desktop dist:win`        | Build installers (`dist:mac`, `dist:linux`)       |
+| `node scripts/split-branches.mjs`                 | Rebuild the `server` and `desktop` branches       |
 
 ### Repository layout
 
@@ -69,27 +70,38 @@ packages/shared   Zod schemas, canonical JSON, Ed25519 manifest signing, rotatin
 apps/server       Fastify API, Prisma schema + seed, manifest resolver, mirror, scripts
 apps/admin        React admin site (Vite, Tailwind, TanStack Query)
 apps/desktop      Electron main (setup engine, phase-2 monitor), preload, React renderer
+deploy            VPS files: Caddyfile, systemd unit, production .env template, update and backup scripts
 ```
+
+### Branches
+
+| Branch    | Contents                                                  | Deployed as                                        |
+| --------- | --------------------------------------------------------- | -------------------------------------------------- |
+| `main`    | Everything. All development happens here and CI runs here | (source of truth)                                  |
+| `server`  | `packages/shared`, `apps/server`, `apps/admin`, `deploy/` | Cloned on the VPS, updated with `deploy/update.sh` |
+| `desktop` | `packages/shared`, `apps/desktop`, the release workflow   | Tag `v*` here to build installers                  |
+
+`server` and `desktop` are generated from `main` by `scripts/split-branches.mjs`. The `Sync deploy branches` workflow runs it after CI passes on `main`. Each sync adds a commit on top, with no force pushes, so `git pull` keeps working on the VPS. Never commit to those branches directly.
 
 ## Configuration
 
 ### Server (`apps/server/.env`)
 
-| Variable                                                                       | Notes                                                                                   |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `NODE_ENV`                                                                     | `production` enforces the settings below and disables placeholder artifacts             |
-| `PUBLIC_BASE_URL`                                                              | Public origin, `https://` required in production                                        |
-| `DATABASE_URL`                                                                 | `file:./dev.db` (SQLite) or `postgresql://...` (see [Deploying](#deploying-the-server)) |
-| `DATA_DIR`                                                                     | Manifest cache, LAN mirror (`mirror/`) and desktop updates (`updates/`)                 |
-| `OTP_PEPPER`                                                                   | 32+ random characters. OTPs are stored as HMAC(pepper, code), never in clear            |
-| `MANIFEST_SIGNING_KEY`                                                         | Ed25519 private key (from `pnpm keys:gen`). Keep it secret                              |
-| `MIN_APP_VERSION`                                                              | Older desktop apps are refused at readiness                                             |
-| `EVENT_SLUG`, `EVENT_NAME`, `EVENT_TIMEZONE`                                   | Single event per deployment                                                             |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | OTP email. Test with Admin → Settings → Email                                           |
-| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`                                      | First superadmin, created by the seed                                                   |
-| `TRUST_PROXY`                                                                  | `true` behind a reverse proxy, so rate limits see client IPs                            |
-| `ADMIN_ORIGINS`                                                                | Extra origins allowed to call admin APIs (the Vite dev server)                          |
-| `GITHUB_TOKEN`                                                                 | Optional. Raises the GitHub API limit for the manifest resolver                         |
+| Variable                                     | Notes                                                                                                                                 |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                   | `production` enforces the settings below and disables placeholder artifacts                                                           |
+| `PUBLIC_BASE_URL`                            | Public origin, `https://` required in production                                                                                      |
+| `DATABASE_URL`                               | `file:./dev.db` (SQLite) or `postgresql://...` (see [Deploying](#deploying-the-server-vps))                                           |
+| `DATA_DIR`                                   | Manifest cache, LAN mirror (`mirror/`) and desktop updates (`updates/`)                                                               |
+| `MANIFEST_SIGNING_KEY`                       | Ed25519 private key (from `pnpm keys:gen`). Keep it secret                                                                            |
+| `MIN_APP_VERSION`                            | Older desktop apps are refused at readiness                                                                                           |
+| `EVENT_SLUG`, `EVENT_NAME`, `EVENT_TIMEZONE` | Single event per deployment                                                                                                           |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`   | Google OAuth "Web application" client for attendee sign-in. Required in production. See [Google sign-in setup](#google-sign-in-setup) |
+| `CONTACT_HINT`                               | Shown when a Google account is not on the RSVP list                                                                                   |
+| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`    | First superadmin, created by the seed                                                                                                 |
+| `TRUST_PROXY`                                | `true` behind a reverse proxy, so rate limits see client IPs                                                                          |
+| `ADMIN_ORIGINS`                              | Extra origins allowed to call admin APIs (the Vite dev server)                                                                        |
+| `GITHUB_TOKEN`                               | Optional. Raises the GitHub API limit for the manifest resolver                                                                       |
 
 ### Desktop build (`apps/desktop/.env`, baked in at build time)
 
@@ -114,10 +126,15 @@ apps/desktop      Electron main (setup engine, phase-2 monitor), preload, React 
   - Linux asks for `pkexec` once, for a constant script.
   - macOS needs admin only for Rosetta on Apple Silicon and the Xcode CLT prompt.
   - Child processes are spawned without a shell. Windows `.bat` shims go through `cmd.exe` with metacharacter-checked arguments.
+- **Attendee sign-in** follows OAuth 2.0 for native apps (RFC 8252):
+  - The app opens the system browser, never an embedded webview. The Google client secret stays on the server.
+  - Google's verified email is matched against the RSVP list.
+  - The server hands the app a one-time code over a `127.0.0.1` loopback redirect. The code lives for 2 minutes, works once, and is bound to a PKCE verifier that never leaves the app, so an intercepted code is useless.
+  - No email is ever sent.
 - **Secrets.**
-  - OTPs are hashed with a pepper, have a 10-minute expiry and allow 5 attempts. They are rate-limited per email.
-  - Session tokens are stored as hashes. The desktop session, device key and QR secret are encrypted with the OS keychain (`safeStorage`).
-  - Logs redact tokens, codes and keys. OTP codes are only printed to the console in development without SMTP.
+  - Session tokens and sign-in codes are stored only as hashes.
+  - The desktop session, device key and QR secret are encrypted with the OS keychain (`safeStorage`).
+  - Logs redact tokens, codes and keys.
 - **Admin.**
   - argon2id passwords, optional TOTP 2FA, httpOnly SameSite=Strict cookies, and an Origin check on every mutation.
   - Roles are superadmin and volunteer, with volunteers limited to the scanner. Everything is written to an audit log.
@@ -142,7 +159,7 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
 
 ### Two weeks before
 
-1. Deploy the server ([below](#deploying-the-server)) with real SMTP. Send yourself a test mail from Admin → Settings → Email.
+1. Deploy the server ([below](#deploying-the-server-vps)) and set up [Google sign-in](#google-sign-in-setup). Check Admin → Settings → Attendee sign-in: it should say "Google".
 2. Settings → Toolchain:
    - pin the Flutter version you will teach;
    - set the minimum free disk space;
@@ -151,7 +168,7 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
 3. Settings → Manifest: upload the starter project zip, then **Refresh manifest**. It must show "signed, resolved", not "placeholder".
 4. Build and sign the installers with the release workflow. Copy the release files into `DATA_DIR/updates/`. Publish download links (for example on the event page).
 5. **Run a real setup on a fresh VM or laptop for each OS** (Windows 11, macOS on Apple Silicon, Ubuntu LTS). It must reach "Ready". Simulate mode does not exercise the real installers.
-6. Import the RSVP CSV (Attendees → Import). Any export with an email column works, plus optionally a name column or first/last name columns.
+6. Import the RSVP CSV (Attendees → Import). Any export with an email column works, plus optionally a name column or first/last name columns. Tell attendees to sign in with the Google account of the email they RSVP'd with.
 7. Create volunteer accounts (Settings → Admin users) and turn on 2FA for every superadmin.
 
 ### The day before
@@ -168,6 +185,7 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
 
 ### Setup help desk
 
+- "Not on the RSVP list" at sign-in means the attendee's Google email differs from their RSVP email. Edit their email in Attendees to the Google one, then have them click **Continue with Google** again.
 - Overview shows who is installing or needs repair. The attendee drawer shows their per-component progress and errors.
 - On the laptop: Setup → "Show live log" and "Copy diagnostics". Setup resumes after network drops and app restarts, so clicking **Retry** is usually enough.
 - Common fixes:
@@ -188,7 +206,7 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
 
 ### After the event
 
-- Export attendance and monitoring, then archive the database (or `DATA_DIR` plus the SQLite file).
+- Export attendance and monitoring, then archive the database (`deploy/backup.sh`).
 - Rotate the manifest key if it might have leaked. Print a new pair with `node scripts/gen-keys.mjs --print` and ship a build that trusts both public keys. Then switch the server to the new private key, and drop the old public key from later builds.
 
 ## LAN mirror
@@ -201,25 +219,64 @@ pnpm --filter @eventkit/server mirror:sync   # downloads and verifies each artif
 
 Then set Admin → Settings → **LAN mirror URL** to `http://<lan-ip>:8080/mirror` (or point it at nginx serving the same directory). The manifest stays signed, and each file keeps its upstream SHA-256, so the mirror cannot substitute binaries. Plain HTTP on the LAN is fine. Clients try the mirror first and fall back to the upstream URL.
 
-## Deploying the server
+## Deploying the server (VPS)
 
-The server is a single Node process. Live updates (SSE) fan out in memory, so run one instance behind TLS.
+A small VPS is enough: 1 vCPU, 1–2 GB RAM, Ubuntu 24.04. Add 30 GB of disk if it also hosts the mirror. The server is one Node process behind Caddy, which handles HTTPS automatically. It uses SQLite on local disk. Commands are for Ubuntu and run as root unless noted.
 
-```sh
-pnpm install --frozen-lockfile
-pnpm --filter @eventkit/server db:pg                         # writes prisma/schema.postgres.prisma
-cd apps/server
-export DATABASE_URL=postgresql://eventkit:***@db:5432/eventkit
-npx prisma db push --schema prisma/schema.postgres.prisma    # creates tables
-npx prisma generate --schema prisma/schema.postgres.prisma
-cd ../..
-pnpm --filter @eventkit/admin build && pnpm --filter @eventkit/server build
-cd apps/server
-NODE_ENV=production pnpm db:seed                             # first superadmin from SUPERADMIN_*, no demo data
-NODE_ENV=production node dist/index.js                       # paths in .env are relative to apps/server
-```
+1. **DNS.** Point an A/AAAA record (for example `event.example.org`) at the VPS.
+2. **Packages.**
+   ```sh
+   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+   apt-get install -y nodejs git sqlite3 debian-keyring debian-archive-keyring apt-transport-https
+   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+   curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
+   apt-get update && apt-get install -y caddy
+   corepack enable
+   ```
+3. **User and code.**
+   ```sh
+   useradd --system --create-home --home-dir /opt/eventkit --shell /bin/bash eventkit
+   install -d -o eventkit -g eventkit /var/lib/eventkit /var/lib/eventkit/data
+   sudo -u eventkit git clone -b server https://github.com/chitrakshbotwala/eventkit /opt/eventkit
+   ```
+4. **Configure.** As `eventkit`, copy `deploy/server.env.example` to `apps/server/.env`, run `chmod 600`, and fill it in:
+   - `PUBLIC_BASE_URL`;
+   - `MANIFEST_SIGNING_KEY` (from `node scripts/gen-keys.mjs --print` on any machine);
+   - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`;
+   - `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD`.
+5. **Build and initialise** (as `eventkit`, in `/opt/eventkit`):
+   ```sh
+   pnpm install --frozen-lockfile
+   pnpm --filter @eventkit/admin build && pnpm --filter @eventkit/server build
+   pnpm --filter @eventkit/server exec prisma db push      # creates the SQLite database
+   pnpm --filter @eventkit/server db:seed                  # first superadmin, no demo data in production
+   ```
+6. **Run.**
+   ```sh
+   cp /opt/eventkit/deploy/eventkit.service /etc/systemd/system/
+   systemctl daemon-reload && systemctl enable --now eventkit
+   cp /opt/eventkit/deploy/Caddyfile /etc/caddy/Caddyfile   # set your hostname in it first
+   systemctl reload caddy
+   ```
+   Open `https://event.example.org`, sign in as the superadmin and turn on 2FA.
+7. **Updates.** Run `/opt/eventkit/deploy/update.sh` as `eventkit`, then `systemctl restart eventkit`.
+8. **Backups.** `deploy/backup.sh` makes a consistent SQLite copy plus `DATA_DIR`. Schedule it hourly from cron and copy the backups off the machine.
 
-Put it behind a TLS proxy and set `TRUST_PROXY=true`. With Caddy, `event.example.org { reverse_proxy 127.0.0.1:8080 }` is all it needs; SSE works without buffering tweaks. SQLite is fine for a single event on one machine. Back up the `.db` file and `DATA_DIR`.
+Postgres is optional, for example when you want a managed database. Run `pnpm --filter @eventkit/server db:pg`, set `DATABASE_URL=postgresql://...`, and use `--schema prisma/schema.postgres.prisma` with `prisma db push` and `prisma generate`. Live updates (SSE) and a few safeguards live in memory, so run exactly one server process.
+
+## Google sign-in setup
+
+1. Go to [Google Cloud console](https://console.cloud.google.com/) and create a project, for example "EventKit".
+2. **OAuth consent screen** (Google Auth Platform → Branding / Audience):
+   - Set the app name and support email. User type: **External**.
+   - Scopes are only `openid`, `email` and `profile`. These are non-sensitive, so Google does not need to review the app.
+   - **Publish the app** ("In production"). While it is in "Testing", only the test users you list can sign in.
+3. **Credentials** → Create OAuth client ID → **Web application**:
+   - Authorized redirect URI: `https://event.example.org/auth/google/callback`. Admin → Settings → Attendee sign-in shows the exact value.
+   - Authorized JavaScript origin: `https://event.example.org`.
+4. Put the client ID and secret in the server `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, then restart the server.
+
+For local development you can add `http://localhost:8080/auth/google/callback` as a second redirect URI on the same client. Or leave `GOOGLE_CLIENT_ID` empty to use the built-in development page; it is refused in production.
 
 ## Building installers and auto-update
 
@@ -266,10 +323,10 @@ Unsigned builds work, but attendees will see scary warnings. Sign anything you h
 
 ## Testing
 
-- `pnpm test` runs about 170 tests:
+- `pnpm test` runs about 180 tests:
   - shared: crypto, QR windows, hash chain, compliance policy, parsers;
-  - server: auth, admin, manifest signing, readiness gate, idempotent scan, phase-2 tamper cases, using real SQLite;
-  - desktop: resumable downloader, setup engine state machine, env and PATH persistence, Windows quoting, network probes, local log.
+  - server: Google sign-in (PKCE, replay, expiry, RSVP matching, ID-token checks), admin, manifest signing, readiness gate, idempotent scan, phase-2 tamper cases, using real SQLite;
+  - desktop: OAuth loopback listener, resumable downloader, setup engine state machine, env and PATH persistence, Windows quoting, network probes, local log.
 - `windows.test.ts` only runs on Windows. CI covers it.
 - Use `pnpm dev:simulate` with `--simulate-fail` and `--simulate-flaky` for end-to-end UI flows.
 - Before an event, do the fresh-VM runs from the runbook. They are the only test of the real installers against real upstreams.
