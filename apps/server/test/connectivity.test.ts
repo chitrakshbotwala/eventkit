@@ -1,8 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { GENESIS_HASH, type ComplianceRow, type LogEntry, type LogEventType, type NetState } from '@eventkit/shared';
+import {
+  GENESIS_HASH,
+  type ComplianceRow,
+  type LogEntry,
+  type LogEventType,
+  type NetState,
+} from '@eventkit/shared';
 import { sealEntry } from '@eventkit/shared/node';
-import { addAdmin, addAttendee, json, loginAdmin, loginAttendee, makeApp, type TestApp } from './helpers';
+import {
+  addAdmin,
+  addAttendee,
+  json,
+  loginAdmin,
+  loginAttendee,
+  makeApp,
+  type TestApp,
+} from './helpers';
 
 const MIN = 60_000;
 let t: TestApp;
@@ -24,7 +38,13 @@ beforeEach(async () => {
   END = t.clock.now - 5 * MIN;
   const event = await t.app.ctx.event();
   await t.prisma.schedule.create({
-    data: { eventId: event.id, startAt: new Date(START), endAt: new Date(END), mode: 'strict', graceSeconds: 120 },
+    data: {
+      eventId: event.id,
+      startAt: new Date(START),
+      endAt: new Date(END),
+      mode: 'strict',
+      graceSeconds: 120,
+    },
   });
 });
 afterEach(async () => t.close());
@@ -73,9 +93,19 @@ const fullPhase = (): Step[] => [
 
 const auth = () => ({ authorization: `Bearer ${token}` });
 const uploadLog = (entries: LogEntry[]) =>
-  t.app.inject({ method: 'POST', url: '/api/connectivity/log', headers: auth(), payload: { logId: entries[0]!.logId, scheduleVersion: 1, entries } });
+  t.app.inject({
+    method: 'POST',
+    url: '/api/connectivity/log',
+    headers: auth(),
+    payload: { logId: entries[0]!.logId, scheduleVersion: 1, entries },
+  });
 const sendEvents = (entries: LogEntry[]) =>
-  t.app.inject({ method: 'POST', url: '/api/connectivity/events', headers: auth(), payload: { entries } });
+  t.app.inject({
+    method: 'POST',
+    url: '/api/connectivity/events',
+    headers: auth(),
+    payload: { entries },
+  });
 
 async function monitoringRow(): Promise<ComplianceRow> {
   const { cookie } = await loginAdmin(t, 'root@example.org');
@@ -154,7 +184,11 @@ describe('phase-2 connectivity', () => {
       { minute: 20.5, type: 'app_stop' },
     ];
     const first = buildLog(steps);
-    const second = buildLog([{ minute: 40, type: 'app_start', state: 'offline' }, ...offlineRun(41, 55), { minute: 56, type: 'online' }]);
+    const second = buildLog([
+      { minute: 40, type: 'app_start', state: 'offline' },
+      ...offlineRun(41, 55),
+      { minute: 56, type: 'online' },
+    ]);
     await uploadLog(first);
     await uploadLog(second);
     const row = await monitoringRow();
@@ -179,9 +213,17 @@ describe('phase-2 connectivity', () => {
     expect(await t.prisma.connectivityEvent.count()).toBe(log.length);
 
     const { cookie } = await loginAdmin(t, 'root@example.org');
-    const csv = await t.app.inject({ method: 'GET', url: '/admin/monitoring/export?format=csv', headers: { cookie } });
+    const csv = await t.app.inject({
+      method: 'GET',
+      url: '/admin/monitoring/export?format=csv',
+      headers: { cookie },
+    });
     expect(csv.body).toContain('Asha Rao,asha@example.com,Compliant');
-    const feed = await t.app.inject({ method: 'GET', url: '/admin/monitoring/feed?limit=10', headers: { cookie } });
+    const feed = await t.app.inject({
+      method: 'GET',
+      url: '/admin/monitoring/feed?limit=10',
+      headers: { cookie },
+    });
     expect(json<{ items: unknown[] }>(feed).items.length).toBeGreaterThan(0);
   });
 
@@ -195,7 +237,11 @@ describe('phase-2 connectivity', () => {
   });
 
   it('requires attendee auth', async () => {
-    const res = await t.app.inject({ method: 'POST', url: '/api/connectivity/events', payload: { entries: [] } });
+    const res = await t.app.inject({
+      method: 'POST',
+      url: '/api/connectivity/events',
+      payload: { entries: [] },
+    });
     expect(res.statusCode).toBe(401);
   });
 });

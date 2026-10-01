@@ -2,7 +2,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import QRCode from 'qrcode';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AdminUser, AuditLogRow, Settings, SettingsUpdateBody } from '@eventkit/shared';
-import { Badge, Banner, Button, Card, Empty, Field, Input, Loading, Modal, PageHeader, Select, Spinner, Table, Td, Th, Toggle } from '../components/ui';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Empty,
+  Field,
+  Input,
+  Loading,
+  Modal,
+  PageHeader,
+  Select,
+  Spinner,
+  Table,
+  Td,
+  Th,
+  Toggle,
+} from '../components/ui';
 import { api, errorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fmtDateTime, fmtRelative } from '../lib/format';
@@ -25,7 +42,10 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" subtitle="Event toolchain, manifest, users and security." />
-      <div className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800" role="tablist">
+      <div
+        className="mb-6 flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800"
+        role="tablist"
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -71,7 +91,9 @@ function ToolchainSection({ settings }: { settings: Settings }) {
   const save = useMutation({
     mutationFn: (patch: SettingsUpdateBody) => api.saveSettings(patch),
     onSuccess: (d) => {
-      qc.setQueryData(['settings'], (old: Awaited<ReturnType<typeof api.settings>> | undefined) => (old ? { ...old, settings: d.settings } : old));
+      qc.setQueryData(['settings'], (old: Awaited<ReturnType<typeof api.settings>> | undefined) =>
+        old ? { ...old, settings: d.settings } : old,
+      );
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     },
@@ -91,34 +113,97 @@ function ToolchainSection({ settings }: { settings: Settings }) {
       androidNdk: form.androidNdk?.trim() || null,
     });
   };
-  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const setComp = (k: keyof Settings['components'], v: boolean) => setForm((f) => ({ ...f, components: { ...f.components, [k]: v } }));
+  const set = <K extends keyof Settings>(k: K, v: Settings[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+  const setComp = (k: keyof Settings['components'], v: boolean) =>
+    setForm((f) => ({ ...f, components: { ...f.components, [k]: v } }));
 
   return (
     <form onSubmit={submit} className="space-y-6">
       <Card title="Versions and downloads">
         <div className="grid gap-5 md:grid-cols-2">
-          <Field label="Pinned Flutter version" hint="Everyone gets exactly this stable version. Empty = latest stable at resolve time.">
-            {(id) => <Input id={id} placeholder="e.g. 3.35.4" value={form.pinnedFlutterVersion ?? ''} onChange={(e) => set('pinnedFlutterVersion', e.target.value || null)} />}
+          <Field
+            label="Pinned Flutter version"
+            hint="Everyone gets exactly this stable version. Empty = latest stable at resolve time."
+          >
+            {(id) => (
+              <Input
+                id={id}
+                placeholder="e.g. 3.35.4"
+                value={form.pinnedFlutterVersion ?? ''}
+                onChange={(e) => set('pinnedFlutterVersion', e.target.value || null)}
+              />
+            )}
           </Field>
-          <Field label="LAN mirror URL" hint="Clients try this first (e.g. http://10.0.0.5:8080/mirror). Files are SHA-256 verified, so HTTP is fine on the LAN.">
-            {(id) => <Input id={id} type="url" placeholder="http://10.0.0.5:8080/mirror" value={form.mirrorBaseUrl ?? ''} onChange={(e) => set('mirrorBaseUrl', e.target.value || null)} />}
+          <Field
+            label="LAN mirror URL"
+            hint="Clients try this first (e.g. http://10.0.0.5:8080/mirror). Files are SHA-256 verified, so HTTP is fine on the LAN."
+          >
+            {(id) => (
+              <Input
+                id={id}
+                type="url"
+                placeholder="http://10.0.0.5:8080/mirror"
+                value={form.mirrorBaseUrl ?? ''}
+                onChange={(e) => set('mirrorBaseUrl', e.target.value || null)}
+              />
+            )}
           </Field>
           <Field label="Minimum free disk (GB)">
-            {(id) => <Input id={id} type="number" min={1} max={500} step={0.5} value={form.minDiskGb} onChange={(e) => set('minDiskGb', Number(e.target.value))} />}
+            {(id) => (
+              <Input
+                id={id}
+                type="number"
+                min={1}
+                max={500}
+                step={0.5}
+                value={form.minDiskGb}
+                onChange={(e) => set('minDiskGb', Number(e.target.value))}
+              />
+            )}
           </Field>
           <Field label="Minimum desktop app version" hint="Older apps are refused at readiness.">
-            {(id) => <Input id={id} value={form.minAppVersion} onChange={(e) => set('minAppVersion', e.target.value)} />}
+            {(id) => (
+              <Input
+                id={id}
+                value={form.minAppVersion}
+                onChange={(e) => set('minAppVersion', e.target.value)}
+              />
+            )}
           </Field>
         </div>
       </Card>
       <Card title="Components">
         <div className="grid gap-4 md:grid-cols-2">
-          <Toggle checked={form.components.android} onChange={(v) => setComp('android', v)} label="Android SDK" description="cmdline-tools, platform-tools, platform + build-tools; license consent shown to attendees." />
-          <Toggle checked={form.components.java} onChange={(v) => setComp('java', v)} label="Java (Temurin JDK 17)" description="Required for Android builds." />
-          <Toggle checked={form.components.chrome} onChange={(v) => setComp('chrome', v)} label="Google Chrome" description="Flutter web + Chrome DevTools." />
-          <Toggle checked={form.components.vscode} onChange={(v) => setComp('vscode', v)} label="VS Code + Dart/Flutter extensions" />
-          <Toggle checked={form.components.warmup} onChange={(v) => setComp('warmup', v)} label="Offline warm-up" description="Starter project + pub cache for the offline phase." />
+          <Toggle
+            checked={form.components.android}
+            onChange={(v) => setComp('android', v)}
+            label="Android SDK"
+            description="cmdline-tools, platform-tools, platform + build-tools; license consent shown to attendees."
+          />
+          <Toggle
+            checked={form.components.java}
+            onChange={(v) => setComp('java', v)}
+            label="Java (Temurin JDK 17)"
+            description="Required for Android builds."
+          />
+          <Toggle
+            checked={form.components.chrome}
+            onChange={(v) => setComp('chrome', v)}
+            label="Google Chrome"
+            description="Flutter web + Chrome DevTools."
+          />
+          <Toggle
+            checked={form.components.vscode}
+            onChange={(v) => setComp('vscode', v)}
+            label="VS Code + Dart/Flutter extensions"
+          />
+          <Toggle
+            checked={form.components.warmup}
+            onChange={(v) => setComp('warmup', v)}
+            label="Offline warm-up"
+            description="Starter project + pub cache for the offline phase."
+          />
           <Toggle
             checked={form.gradleWarmup}
             onChange={(v) => set('gradleWarmup', v)}
@@ -130,10 +215,33 @@ function ToolchainSection({ settings }: { settings: Settings }) {
       </Card>
       <Card title="Android packages">
         <div className="grid gap-5 md:grid-cols-3">
-          <Field label="Platform">{(id) => <Input id={id} value={form.androidPlatform} onChange={(e) => set('androidPlatform', e.target.value)} />}</Field>
-          <Field label="Build tools">{(id) => <Input id={id} value={form.androidBuildTools} onChange={(e) => set('androidBuildTools', e.target.value)} />}</Field>
+          <Field label="Platform">
+            {(id) => (
+              <Input
+                id={id}
+                value={form.androidPlatform}
+                onChange={(e) => set('androidPlatform', e.target.value)}
+              />
+            )}
+          </Field>
+          <Field label="Build tools">
+            {(id) => (
+              <Input
+                id={id}
+                value={form.androidBuildTools}
+                onChange={(e) => set('androidBuildTools', e.target.value)}
+              />
+            )}
+          </Field>
           <Field label="NDK (optional)" hint="e.g. ndk;27.0.12077973">
-            {(id) => <Input id={id} value={form.androidNdk ?? ''} placeholder="not installed" onChange={(e) => set('androidNdk', e.target.value || null)} />}
+            {(id) => (
+              <Input
+                id={id}
+                value={form.androidNdk ?? ''}
+                placeholder="not installed"
+                onChange={(e) => set('androidNdk', e.target.value || null)}
+              />
+            )}
           </Field>
         </div>
       </Card>
@@ -141,7 +249,11 @@ function ToolchainSection({ settings }: { settings: Settings }) {
         <Button variant="primary" type="submit" disabled={save.isPending}>
           {save.isPending && <Spinner />} Save settings
         </Button>
-        {saved && <span className="text-sm text-emerald-600">Saved. New manifests are signed with these settings.</span>}
+        {saved && (
+          <span className="text-sm text-emerald-600">
+            Saved. New manifests are signed with these settings.
+          </span>
+        )}
       </div>
       {save.error && <Banner tone="error">{errorMessage(save.error)}</Banner>}
     </form>
@@ -157,8 +269,13 @@ function ManifestSection({ settings }: { settings: Settings }) {
     queryFn: api.resolveStatus,
     refetchInterval: (query) => (query.state.data?.state === 'running' ? 2000 : false),
   });
-  const resolve = useMutation({ mutationFn: api.resolveManifest, onSuccess: () => void qc.invalidateQueries({ queryKey: ['resolve-status'] }) });
-  const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.manifestPreview>> | null>(null);
+  const resolve = useMutation({
+    mutationFn: api.resolveManifest,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['resolve-status'] }),
+  });
+  const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.manifestPreview>> | null>(
+    null,
+  );
   const loadPreview = useMutation({ mutationFn: api.manifestPreview, onSuccess: setPreview });
 
   const [file, setFile] = useState<File | null>(null);
@@ -170,7 +287,10 @@ function ManifestSection({ settings }: { settings: Settings }) {
       void qc.invalidateQueries({ queryKey: ['settings'] });
     },
   });
-  const remove = useMutation({ mutationFn: api.removeStarter, onSuccess: () => void qc.invalidateQueries({ queryKey: ['settings'] }) });
+  const remove = useMutation({
+    mutationFn: api.removeStarter,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['settings'] }),
+  });
   const st = status.data;
 
   return (
@@ -182,26 +302,48 @@ function ManifestSection({ settings }: { settings: Settings }) {
             <Button onClick={() => loadPreview.mutate()} disabled={loadPreview.isPending}>
               {loadPreview.isPending && <Spinner />} Preview
             </Button>
-            <Button variant="primary" onClick={() => resolve.mutate()} disabled={resolve.isPending || st?.state === 'running'}>
+            <Button
+              variant="primary"
+              onClick={() => resolve.mutate()}
+              disabled={resolve.isPending || st?.state === 'running'}
+            >
               {st?.state === 'running' && <Spinner />} Refresh from upstream
             </Button>
           </>
         }
       >
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Resolves the latest Flutter stable (or the pinned version), Temurin 17, Git, VS Code, Android command-line tools and Chrome, computes missing SHA-256 hashes
-          by downloading into the server mirror, and signs per-platform manifests with Ed25519. This can take several minutes.
+          Resolves the latest Flutter stable (or the pinned version), Temurin 17, Git, VS Code,
+          Android command-line tools and Chrome, computes missing SHA-256 hashes by downloading into
+          the server mirror, and signs per-platform manifests with Ed25519. This can take several
+          minutes.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="text-slate-500">Last resolved:</span>
-          <span className="font-medium">{st?.resolvedAt ? fmtDateTime(st.resolvedAt) : 'never (placeholder manifest in dev)'}</span>
+          <span className="font-medium">
+            {st?.resolvedAt ? fmtDateTime(st.resolvedAt) : 'never (placeholder manifest in dev)'}
+          </span>
           {st && (
-            <Badge tone={st.state === 'done' ? 'green' : st.state === 'failed' ? 'red' : st.state === 'running' ? 'blue' : 'gray'}>{st.state}</Badge>
+            <Badge
+              tone={
+                st.state === 'done'
+                  ? 'green'
+                  : st.state === 'failed'
+                    ? 'red'
+                    : st.state === 'running'
+                      ? 'blue'
+                      : 'gray'
+              }
+            >
+              {st.state}
+            </Badge>
           )}
           {st?.message && <span className="text-xs text-slate-500">{st.message}</span>}
         </div>
         {st && st.log.length > 0 && (
-          <pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-200">{st.log.slice(-80).join('\n')}</pre>
+          <pre className="mt-4 max-h-64 overflow-auto rounded-lg bg-slate-950 p-3 text-[11px] leading-relaxed text-slate-200">
+            {st.log.slice(-80).join('\n')}
+          </pre>
         )}
         {resolve.error && (
           <div className="mt-3">
@@ -232,7 +374,9 @@ function ManifestSection({ settings }: { settings: Settings }) {
                         <Td className="text-xs">
                           {(() => {
                             const f = m.components.find((c) => c.id === 'flutter');
-                            return f && f.id === 'flutter' ? `${f.version}${f.pinned ? ' (pinned)' : ''}` : '—';
+                            return f && f.id === 'flutter'
+                              ? `${f.version}${f.pinned ? ' (pinned)' : ''}`
+                              : '—';
                           })()}
                           {m.placeholder && (
                             <div>
@@ -259,7 +403,8 @@ function ManifestSection({ settings }: { settings: Settings }) {
 
       <Card title="Starter project">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          A zipped Flutter project attendees get during setup. The app runs <code>flutter pub get</code> and checks <code>pub get --offline</code>, so everything it
+          A zipped Flutter project attendees get during setup. The app runs{' '}
+          <code>flutter pub get</code> and checks <code>pub get --offline</code>, so everything it
           depends on is cached for the offline phase.
         </p>
         {settings.starterProject ? (
@@ -267,18 +412,35 @@ function ManifestSection({ settings }: { settings: Settings }) {
             <Badge tone="green">uploaded</Badge>
             <span className="font-medium">{settings.starterProject.projectName}</span>
             <span className="text-xs text-slate-500">
-              {(settings.starterProject.size / 1024).toFixed(0)} KB · {fmtRelative(settings.starterProject.uploadedAt)} · sha256 {settings.starterProject.sha256.slice(0, 12)}…
+              {(settings.starterProject.size / 1024).toFixed(0)} KB ·{' '}
+              {fmtRelative(settings.starterProject.uploadedAt)} · sha256{' '}
+              {settings.starterProject.sha256.slice(0, 12)}…
             </span>
-            <Button size="sm" variant="ghost" className="ml-auto text-red-600" onClick={() => remove.mutate()} disabled={remove.isPending}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto text-red-600"
+              onClick={() => remove.mutate()}
+              disabled={remove.isPending}
+            >
               Remove
             </Button>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">No starter uploaded: attendees get a fresh <code>flutter create</code> project instead.</p>
+          <p className="mt-3 text-sm text-slate-500">
+            No starter uploaded: attendees get a fresh <code>flutter create</code> project instead.
+          </p>
         )}
         <div className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
           <Field label="Project folder name" hint="snake_case, e.g. starter_app">
-            {(id) => <Input id={id} value={name} pattern="[a-z][a-z0-9_]*" onChange={(e) => setName(e.target.value)} />}
+            {(id) => (
+              <Input
+                id={id}
+                value={name}
+                pattern="[a-z][a-z0-9_]*"
+                onChange={(e) => setName(e.target.value)}
+              />
+            )}
           </Field>
           <Field label="Zip file">
             {(id) => (
@@ -291,7 +453,11 @@ function ManifestSection({ settings }: { settings: Settings }) {
               />
             )}
           </Field>
-          <Button variant="primary" disabled={!file || !/^[a-z][a-z0-9_]*$/.test(name) || upload.isPending} onClick={() => upload.mutate()}>
+          <Button
+            variant="primary"
+            disabled={!file || !/^[a-z][a-z0-9_]*$/.test(name) || upload.isPending}
+            onClick={() => upload.mutate()}
+          >
             {upload.isPending && <Spinner />} Upload
           </Button>
         </div>
@@ -314,8 +480,18 @@ function EmailSection({ configured }: { configured: boolean }) {
   return (
     <Card title="Email (OTP delivery)">
       <div className="mb-4 flex items-center gap-2 text-sm">
-        SMTP: {configured ? <Badge tone="green">configured</Badge> : <Badge tone="amber">not configured</Badge>}
-        {!configured && <span className="text-slate-500">In development, OTP codes are printed to the server console. Configure SMTP_* env vars for production.</span>}
+        SMTP:{' '}
+        {configured ? (
+          <Badge tone="green">configured</Badge>
+        ) : (
+          <Badge tone="amber">not configured</Badge>
+        )}
+        {!configured && (
+          <span className="text-slate-500">
+            In development, OTP codes are printed to the server console. Configure SMTP_* env vars
+            for production.
+          </span>
+        )}
       </div>
       <form
         onSubmit={(e) => {
@@ -325,14 +501,30 @@ function EmailSection({ configured }: { configured: boolean }) {
         className="flex flex-wrap items-end gap-3"
       >
         <div className="w-80">
-          <Field label="Send a test email to">{(id) => <Input id={id} type="email" required value={to} onChange={(e) => setTo(e.target.value)} />}</Field>
+          <Field label="Send a test email to">
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                required
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
+            )}
+          </Field>
         </div>
         <Button type="submit" variant="primary" disabled={test.isPending}>
           {test.isPending && <Spinner />} Send test
         </Button>
       </form>
       <div className="mt-3">
-        {test.isSuccess && <Banner tone="success">{test.data.configured ? 'Test email sent.' : 'Not configured: the message was logged to the server console.'}</Banner>}
+        {test.isSuccess && (
+          <Banner tone="success">
+            {test.data.configured
+              ? 'Test email sent.'
+              : 'Not configured: the message was logged to the server console.'}
+          </Banner>
+        )}
         {test.error && <Banner tone="error">{errorMessage(test.error)}</Banner>}
       </div>
     </Card>
@@ -381,7 +573,8 @@ function UsersSection() {
               <tr key={u.id} className={u.disabled ? 'opacity-60' : ''}>
                 <Td>
                   <div className="font-medium">
-                    {u.name} {u.id === me?.id && <span className="text-xs text-slate-400">(you)</span>}
+                    {u.name}{' '}
+                    {u.id === me?.id && <span className="text-xs text-slate-400">(you)</span>}
                   </div>
                   <div className="text-xs text-slate-500">{u.email}</div>
                 </Td>
@@ -423,7 +616,15 @@ function UsersSection() {
   );
 }
 
-function UserDialog({ open, user, onClose }: { open: boolean; user?: AdminUser | null; onClose: () => void }) {
+function UserDialog({
+  open,
+  user,
+  onClose,
+}: {
+  open: boolean;
+  user?: AdminUser | null;
+  onClose: () => void;
+}) {
   const qc = useQueryClient();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -454,8 +655,24 @@ function UserDialog({ open, user, onClose }: { open: boolean; user?: AdminUser |
         }}
         className="space-y-4"
       >
-        {!user && <Field label="Email">{(id) => <Input id={id} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />}</Field>}
-        <Field label="Name">{(id) => <Input id={id} required value={name} onChange={(e) => setName(e.target.value)} />}</Field>
+        {!user && (
+          <Field label="Email">
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            )}
+          </Field>
+        )}
+        <Field label="Name">
+          {(id) => (
+            <Input id={id} required value={name} onChange={(e) => setName(e.target.value)} />
+          )}
+        </Field>
         <Field label="Role" hint="Volunteers can only scan QR codes and look up attendees.">
           {(id) => (
             <Select id={id} value={role} onChange={(e) => setRole(e.target.value)}>
@@ -464,8 +681,21 @@ function UserDialog({ open, user, onClose }: { open: boolean; user?: AdminUser |
             </Select>
           )}
         </Field>
-        <Field label={user ? 'New password (optional)' : 'Password'} hint="At least 10 characters. Changing it signs the user out everywhere.">
-          {(id) => <Input id={id} type="password" autoComplete="new-password" minLength={10} required={!user} value={password} onChange={(e) => setPassword(e.target.value)} />}
+        <Field
+          label={user ? 'New password (optional)' : 'Password'}
+          hint="At least 10 characters. Changing it signs the user out everywhere."
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              required={!user}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
         </Field>
         {save.error && <Banner tone="error">{errorMessage(save.error)}</Banner>}
         <div className="flex justify-end gap-2">
@@ -483,11 +713,14 @@ function UserDialog({ open, user, onClose }: { open: boolean; user?: AdminUser |
 
 function AccountSection() {
   const { admin, refresh } = useAuth();
-  const [enroll, setEnroll] = useState<{ secret: string; otpauthUrl: string; qr: string } | null>(null);
+  const [enroll, setEnroll] = useState<{ secret: string; otpauthUrl: string; qr: string } | null>(
+    null,
+  );
   const [code, setCode] = useState('');
   const start = useMutation({
     mutationFn: api.totpEnroll,
-    onSuccess: async (r) => setEnroll({ ...r, qr: await QRCode.toDataURL(r.otpauthUrl, { margin: 1, width: 220 }) }),
+    onSuccess: async (r) =>
+      setEnroll({ ...r, qr: await QRCode.toDataURL(r.otpauthUrl, { margin: 1, width: 220 }) }),
   });
   const confirm = useMutation({
     mutationFn: () => api.totpConfirm(code),
@@ -509,7 +742,9 @@ function AccountSection() {
     <Card title="Two-factor authentication">
       {admin?.totpEnabled ? (
         <div className="space-y-4">
-          <Banner tone="success">Two-factor authentication is on. You need your authenticator code to sign in.</Banner>
+          <Banner tone="success">
+            Two-factor authentication is on. You need your authenticator code to sign in.
+          </Banner>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -519,10 +754,22 @@ function AccountSection() {
           >
             <div className="w-48">
               <Field label="Current code">
-                {(id) => <Input id={id} inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />}
+                {(id) => (
+                  <Input
+                    id={id}
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  />
+                )}
               </Field>
             </div>
-            <Button variant="danger" type="submit" disabled={code.length !== 6 || disable.isPending}>
+            <Button
+              variant="danger"
+              type="submit"
+              disabled={code.length !== 6 || disable.isPending}
+            >
               Disable 2FA
             </Button>
           </form>
@@ -530,10 +777,16 @@ function AccountSection() {
         </div>
       ) : enroll ? (
         <div className="grid gap-6 md:grid-cols-[220px_1fr]">
-          <img src={enroll.qr} alt="Authenticator setup QR code" className="h-[220px] w-[220px] rounded-lg bg-white p-2 ring-1 ring-slate-200" />
+          <img
+            src={enroll.qr}
+            alt="Authenticator setup QR code"
+            className="h-[220px] w-[220px] rounded-lg bg-white p-2 ring-1 ring-slate-200"
+          />
           <div className="space-y-4 text-sm">
             <p>Scan with Google Authenticator, 1Password, Authy, … or enter the key manually:</p>
-            <code className="block break-all rounded bg-slate-100 px-3 py-2 font-mono text-sm dark:bg-slate-800">{enroll.secret}</code>
+            <code className="block break-all rounded bg-slate-100 px-3 py-2 font-mono text-sm dark:bg-slate-800">
+              {enroll.secret}
+            </code>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -543,10 +796,23 @@ function AccountSection() {
             >
               <div className="w-48">
                 <Field label="Code from the app">
-                  {(id) => <Input id={id} inputMode="numeric" maxLength={6} autoFocus value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />}
+                  {(id) => (
+                    <Input
+                      id={id}
+                      inputMode="numeric"
+                      maxLength={6}
+                      autoFocus
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    />
+                  )}
                 </Field>
               </div>
-              <Button variant="primary" type="submit" disabled={code.length !== 6 || confirm.isPending}>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={code.length !== 6 || confirm.isPending}
+              >
                 Enable
               </Button>
               <Button onClick={() => setEnroll(null)}>Cancel</Button>
@@ -556,7 +822,9 @@ function AccountSection() {
         </div>
       ) : (
         <div className="space-y-3 text-sm">
-          <p className="text-slate-600 dark:text-slate-300">Protect your organizer account with a time-based one-time code (RFC 6238).</p>
+          <p className="text-slate-600 dark:text-slate-300">
+            Protect your organizer account with a time-based one-time code (RFC 6238).
+          </p>
           <Button variant="primary" onClick={() => start.mutate()} disabled={start.isPending}>
             {start.isPending && <Spinner />} Set up 2FA
           </Button>
@@ -608,7 +876,13 @@ function AuditSection() {
           }}
           className="flex gap-2"
         >
-          <Input aria-label="Action prefix" placeholder="action prefix, e.g. scan." value={action} onChange={(e) => setAction(e.target.value)} className="w-56" />
+          <Input
+            aria-label="Action prefix"
+            placeholder="action prefix, e.g. scan."
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            className="w-56"
+          />
           <Button type="submit">Filter</Button>
         </form>
       }
@@ -629,11 +903,22 @@ function AuditSection() {
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
             {items.map((r) => (
-              <tr key={r.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40" onClick={() => setDetail(r)}>
-                <Td className="whitespace-nowrap text-xs tabular-nums">{fmtDateTime(r.createdAt)}</Td>
+              <tr
+                key={r.id}
+                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                onClick={() => setDetail(r)}
+              >
+                <Td className="whitespace-nowrap text-xs tabular-nums">
+                  {fmtDateTime(r.createdAt)}
+                </Td>
                 <Td className="font-mono text-xs">{r.action}</Td>
-                <Td className="text-xs">{r.actorLabel ?? (r.actorId ? `${r.actorType}:${r.actorId.slice(-8)}` : r.actorType)}</Td>
-                <Td className="font-mono text-xs text-slate-500">{r.target ? r.target.slice(-10) : ''}</Td>
+                <Td className="text-xs">
+                  {r.actorLabel ??
+                    (r.actorId ? `${r.actorType}:${r.actorId.slice(-8)}` : r.actorType)}
+                </Td>
+                <Td className="font-mono text-xs text-slate-500">
+                  {r.target ? r.target.slice(-10) : ''}
+                </Td>
                 <Td className="text-xs text-slate-500">{r.ip}</Td>
               </tr>
             ))}
@@ -652,8 +937,15 @@ function AuditSection() {
           )
         )}
       </div>
-      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title={detail?.action ?? ''} wide>
-        <pre className="overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-200">{JSON.stringify(detail, null, 2)}</pre>
+      <Modal
+        open={Boolean(detail)}
+        onClose={() => setDetail(null)}
+        title={detail?.action ?? ''}
+        wide
+      >
+        <pre className="overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-200">
+          {JSON.stringify(detail, null, 2)}
+        </pre>
       </Modal>
     </Card>
   );

@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest';
 import type { Schedule } from '@eventkit/shared';
 import { verifyChain } from '@eventkit/shared/node';
 import { LocalLog } from '../src/main/phase2/eventlog';
-import { activeInterfaces, isPrivateHost, probeReachability, type Probe } from '../src/main/phase2/netprobe';
+import {
+  activeInterfaces,
+  isPrivateHost,
+  probeReachability,
+  type Probe,
+} from '../src/main/phase2/netprobe';
 import { inEnforcedWindow, isMonitoring, phaseState } from '../src/main/phase2/state';
 
 const T = Date.UTC(2026, 9, 10, 10, 0, 0);
@@ -67,10 +72,19 @@ describe('interfaces', () => {
   });
 
   it('knows private hosts do not prove internet access', () => {
-    for (const h of ['localhost', '10.0.0.5', '192.168.0.2', '172.20.1.1', '[::1]', 'fd12::1', 'server.lan']) {
+    for (const h of [
+      'localhost',
+      '10.0.0.5',
+      '192.168.0.2',
+      '172.20.1.1',
+      '[::1]',
+      'fd12::1',
+      'server.lan',
+    ]) {
       expect(isPrivateHost(h)).toBe(true);
     }
-    for (const h of ['event.example.org', '8.8.8.8', '172.32.0.1']) expect(isPrivateHost(h)).toBe(false);
+    for (const h of ['event.example.org', '8.8.8.8', '172.32.0.1'])
+      expect(isPrivateHost(h)).toBe(false);
   });
 });
 
@@ -83,7 +97,11 @@ describe('reachability probes', () => {
   };
 
   it('offline: nothing answers', async () => {
-    const r = await probeReachability({ fetch: fetchFrom({}), serverUrl: 'https://event.example.org', tcp: async () => down });
+    const r = await probeReachability({
+      fetch: fetchFrom({}),
+      serverUrl: 'https://event.example.org',
+      tcp: async () => down,
+    });
     expect(r).toMatchObject({ internet: false, serverReachable: false, captive: false });
   });
 
@@ -135,7 +153,11 @@ describe('LocalLog', () => {
 
   it('writes a verifiable hash chain and tracks delivery', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ek-log-'));
-    const log = new LocalLog(dir, () => key, () => 1500);
+    const log = new LocalLog(
+      dir,
+      () => key,
+      () => 1500,
+    );
     expect(log.open(3)).toBe(true);
     expect(log.open(3)).toBe(false);
     log.append('app_start', { state: 'online' });
@@ -159,13 +181,21 @@ describe('LocalLog', () => {
 
   it('survives restarts and a torn last line', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ek-log-'));
-    const a = new LocalLog(dir, () => key, () => 0);
+    const a = new LocalLog(
+      dir,
+      () => key,
+      () => 0,
+    );
     a.open(1);
     a.append('app_start');
     a.append('heartbeat');
     const file = readdirSync(dir).find((f) => f.endsWith('.jsonl'))!;
     appendFileSync(join(dir, file), '{"logId":"trunc');
-    const b = new LocalLog(dir, () => key, () => 0);
+    const b = new LocalLog(
+      dir,
+      () => key,
+      () => 0,
+    );
     expect(b.isOpen).toBe(true);
     b.append('app_start');
     const entries = b.entries();
@@ -174,7 +204,11 @@ describe('LocalLog', () => {
   });
 
   it('does nothing without a device key (signed out)', () => {
-    const log = new LocalLog(mkdtempSync(join(tmpdir(), 'ek-log-')), () => null, () => 0);
+    const log = new LocalLog(
+      mkdtempSync(join(tmpdir(), 'ek-log-')),
+      () => null,
+      () => 0,
+    );
     log.open(1);
     expect(log.append('heartbeat')).toBeNull();
   });

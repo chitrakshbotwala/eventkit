@@ -18,7 +18,13 @@ function describe(e: AdminStreamEvent): Activity | null {
   const now = new Date().toISOString();
   switch (e.type) {
     case 'checkin':
-      return { key: `c-${e.data.attendeeId}-${e.data.at}`, at: e.data.at, text: `${e.data.name} checked in (${e.data.method})`, tone: 'green', label: 'Check-in' };
+      return {
+        key: `c-${e.data.attendeeId}-${e.data.at}`,
+        at: e.data.at,
+        text: `${e.data.name} checked in (${e.data.method})`,
+        tone: 'green',
+        label: 'Check-in',
+      };
     case 'readiness':
       return {
         key: `r-${e.data.attendeeId}-${now}`,
@@ -28,7 +34,8 @@ function describe(e: AdminStreamEvent): Activity | null {
         label: 'Readiness',
       };
     case 'connectivity':
-      if (!['online', 'limited', 'app_stop', 'clock_anomaly'].includes(e.data.eventType)) return null;
+      if (!['online', 'limited', 'app_stop', 'clock_anomaly'].includes(e.data.eventType))
+        return null;
       return {
         key: `n-${e.data.deviceId}-${e.data.at}-${e.data.eventType}`,
         at: e.data.at,
@@ -37,7 +44,13 @@ function describe(e: AdminStreamEvent): Activity | null {
         label: 'Phase 2',
       };
     case 'schedule':
-      return { key: `s-${e.data.version}`, at: now, text: `Phase 2 schedule updated (v${e.data.version})`, tone: 'gray', label: 'Schedule' };
+      return {
+        key: `s-${e.data.version}`,
+        at: now,
+        text: `Phase 2 schedule updated (v${e.data.version})`,
+        tone: 'gray',
+        label: 'Schedule',
+      };
     default:
       return null;
   }
@@ -50,14 +63,18 @@ export function OverviewPage() {
 
   useStream((e) => {
     if (e.type === 'counters') {
-      qc.setQueryData(['overview'], (old: { counters: OverviewCounters; serverTime: number } | undefined) => ({
-        counters: e.data,
-        serverTime: old?.serverTime ?? Date.now(),
-      }));
+      qc.setQueryData(
+        ['overview'],
+        (old: { counters: OverviewCounters; serverTime: number } | undefined) => ({
+          counters: e.data,
+          serverTime: old?.serverTime ?? Date.now(),
+        }),
+      );
       return;
     }
     const a = describe(e);
-    if (a) setActivity((prev) => (prev.some((p) => p.key === a.key) ? prev : [a, ...prev].slice(0, 60)));
+    if (a)
+      setActivity((prev) => (prev.some((p) => p.key === a.key) ? prev : [a, ...prev].slice(0, 60)));
   });
 
   if (q.isLoading) return <Loading />;
@@ -70,13 +87,42 @@ export function OverviewPage() {
       <PageHeader title="Overview" subtitle="Live status of the event. Updates in real time." />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="RSVP'd" value={c.rsvp} />
-        <Stat label="Logged in" value={c.loggedIn} tone="blue" hint={`${pct(c.loggedIn)}% of RSVPs`} />
-        <Stat label="Installing" value={c.installing} tone="amber" hint="setup running or needs repair" />
+        <Stat
+          label="Logged in"
+          value={c.loggedIn}
+          tone="blue"
+          hint={`${pct(c.loggedIn)}% of RSVPs`}
+        />
+        <Stat
+          label="Installing"
+          value={c.installing}
+          tone="amber"
+          hint="setup running or needs repair"
+        />
         <Stat label="Ready" value={c.ready} tone="green" hint={`${pct(c.ready)}% of RSVPs`} />
-        <Stat label="Checked in" value={c.checkedIn} tone="green" hint={`${pct(c.checkedIn)}% of RSVPs`} />
-        <Stat label="Phase-2 compliant" value={c.compliant} tone="green" hint="verified log, never online" />
-        <Stat label="Violations" value={c.violations} tone="red" hint="online during the window or tampered" />
-        <Stat label="Warnings / unverified" value={`${c.warnings} / ${c.unverified}`} tone="amber" />
+        <Stat
+          label="Checked in"
+          value={c.checkedIn}
+          tone="green"
+          hint={`${pct(c.checkedIn)}% of RSVPs`}
+        />
+        <Stat
+          label="Phase-2 compliant"
+          value={c.compliant}
+          tone="green"
+          hint="verified log, never online"
+        />
+        <Stat
+          label="Violations"
+          value={c.violations}
+          tone="red"
+          hint="online during the window or tampered"
+        />
+        <Stat
+          label="Warnings / unverified"
+          value={`${c.warnings} / ${c.unverified}`}
+          tone="amber"
+        />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -95,7 +141,10 @@ export function OverviewPage() {
                   </span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                  <div className={`h-full rounded-full ${row.color} transition-[width] duration-500`} style={{ width: `${pct(row.n)}%` }} />
+                  <div
+                    className={`h-full rounded-full ${row.color} transition-[width] duration-500`}
+                    style={{ width: `${pct(row.n)}%` }}
+                  />
                 </div>
               </div>
             ))}
@@ -103,14 +152,18 @@ export function OverviewPage() {
         </Card>
         <Card title="Live activity">
           {activity.length === 0 ? (
-            <Empty title="Waiting for activity">Check-ins, readiness and phase-2 alerts appear here.</Empty>
+            <Empty title="Waiting for activity">
+              Check-ins, readiness and phase-2 alerts appear here.
+            </Empty>
           ) : (
             <ul className="-my-2 max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
               {activity.map((a) => (
                 <li key={a.key} className="flex items-start gap-2 py-2 text-sm">
                   <Badge tone={a.tone}>{a.label}</Badge>
                   <span className="min-w-0 flex-1">{a.text}</span>
-                  <span className="shrink-0 text-xs tabular-nums text-slate-400">{fmtTime(a.at)}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-slate-400">
+                    {fmtTime(a.at)}
+                  </span>
                 </li>
               ))}
             </ul>

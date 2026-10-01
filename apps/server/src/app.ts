@@ -35,7 +35,7 @@ export interface BuildOptions {
   logger?: boolean;
 }
 
-const API_PREFIXES = ['/api/', '/admin/', '/auth/', '/mirror/'];
+const API_PREFIXES = ['/api/', '/admin/', '/auth/', '/mirror/', '/updates/'];
 
 export async function buildApp(opts: BuildOptions): Promise<FastifyInstance> {
   const { env, prisma } = opts;
@@ -135,6 +135,22 @@ export async function buildApp(opts: BuildOptions): Promise<FastifyInstance> {
     index: false,
     list: false,
     dotfiles: 'deny',
+  });
+
+  // Desktop auto-updates: copy a release's latest*.yml files and installers here.
+  // electron-updater verifies each file's sha512 from latest*.yml.
+  const updates = resolve(env.DATA_DIR, 'updates');
+  await mkdir(updates, { recursive: true });
+  await app.register(fastifyStatic, {
+    root: updates,
+    prefix: '/updates/',
+    decorateReply: false,
+    index: false,
+    list: false,
+    dotfiles: 'deny',
+    setHeaders: (reply, path) => {
+      if (path.endsWith('.yml')) reply.header('cache-control', 'no-cache');
+    },
   });
 
   // Admin SPA (built by apps/admin) with history-API fallback.

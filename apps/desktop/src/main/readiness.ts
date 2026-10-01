@@ -43,7 +43,10 @@ export function buildReport(engine: SetupEngine): ReadinessReport | null {
  * passes, returns the per-attendee QR secret (kept in safeStorage).
  * `force` also reports regressions so the server stops accepting scans.
  */
-export async function submitReadiness(engine: SetupEngine, opts: { force?: boolean } = {}): Promise<void> {
+export async function submitReadiness(
+  engine: SetupEngine,
+  opts: { force?: boolean } = {},
+): Promise<void> {
   const report = buildReport(engine);
   const key = auth.deviceKey;
   if (!report || !key || !auth.state().signedIn) return;
@@ -52,7 +55,11 @@ export async function submitReadiness(engine: SetupEngine, opts: { force?: boole
 
   const local = evaluateReadiness(report, manifest);
   if (!local.passed && !opts.force) {
-    engine.setReadiness({ state: 'not_ready', reasons: local.reasons, checkedAt: new Date().toISOString() });
+    engine.setReadiness({
+      state: 'not_ready',
+      reasons: local.reasons,
+      checkedAt: new Date().toISOString(),
+    });
     return;
   }
   engine.setReadiness({ state: 'submitting', reasons: [], checkedAt: new Date().toISOString() });
@@ -69,14 +76,20 @@ export async function submitReadiness(engine: SetupEngine, opts: { force?: boole
     } else {
       auth.patchProfile({ status: 'not_ready', ready: false });
       log.warn(`readiness rejected: ${res.reasons.join('; ')}`);
-      engine.setReadiness({ state: 'rejected', reasons: res.reasons, checkedAt: new Date().toISOString() });
+      engine.setReadiness({
+        state: 'rejected',
+        reasons: res.reasons,
+        checkedAt: new Date().toISOString(),
+      });
     }
   } catch (err) {
     const offline = err instanceof ApiError && err.offline;
     log.warn(`readiness submission failed: ${errMsg(err)}`);
     engine.setReadiness({
       state: offline ? 'offline' : 'rejected',
-      reasons: offline ? ['Could not reach the event server. Connect to the internet and try again.'] : [errMsg(err)],
+      reasons: offline
+        ? ['Could not reach the event server. Connect to the internet and try again.']
+        : [errMsg(err)],
       checkedAt: new Date().toISOString(),
     });
   }

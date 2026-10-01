@@ -1,6 +1,8 @@
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, session, shell, type WebContents } from 'electron';
 import { logger } from './logger';
+import { sameRenderer } from './trusted-url';
 
 const log = logger.scope('window');
 
@@ -10,7 +12,7 @@ export function rendererUrl(): string {
   const dev = process.env['ELECTRON_RENDERER_URL'];
   return dev && !app.isPackaged
     ? dev
-    : `file://${join(__dirname, '../renderer/index.html').replace(/\\/g, '/')}`;
+    : pathToFileURL(join(__dirname, '../renderer/index.html')).href;
 }
 
 export function getMainWindow() {
@@ -21,9 +23,7 @@ export function getMainWindow() {
 export function isTrustedSender(sender: WebContents, frameUrl: string | undefined): boolean {
   const win = getMainWindow();
   if (!win || sender.id !== win.webContents.id || !frameUrl) return false;
-  const expected = rendererUrl();
-  if (expected.startsWith('file://')) return frameUrl.split('#')[0]!.split('?')[0] === expected;
-  return new URL(frameUrl).origin === new URL(expected).origin;
+  return sameRenderer(frameUrl, rendererUrl());
 }
 
 /** Global hardening: no navigation, no new windows, no webviews, no permissions. */

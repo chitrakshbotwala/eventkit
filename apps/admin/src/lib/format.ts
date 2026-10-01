@@ -15,7 +15,11 @@ export function fmtDateTime(iso: string | null | undefined, tz?: string): string
 
 export function fmtTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
 export function fmtRelative(iso: string | null | undefined, now = Date.now()): string {
@@ -59,7 +63,14 @@ function wallParts(utcMs: number, timeZone: string) {
     second: '2-digit',
   }).formatToParts(new Date(utcMs));
   const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0');
-  return { y: get('year'), mo: get('month'), d: get('day'), h: get('hour') % 24, mi: get('minute'), s: get('second') };
+  return {
+    y: get('year'),
+    mo: get('month'),
+    d: get('day'),
+    h: get('hour') % 24,
+    mi: get('minute'),
+    s: get('second'),
+  };
 }
 
 /** Offset (ms) of `timeZone` from UTC at instant `utcMs`. */

@@ -23,7 +23,10 @@ export async function adminAttendanceRoutes(app: FastifyInstance) {
 
   app.post(
     '/admin/scan',
-    { preHandler: requireAdmin('superadmin', 'volunteer'), config: { rateLimit: { max: 240, timeWindow: '1 minute' } } },
+    {
+      preHandler: requireAdmin('superadmin', 'volunteer'),
+      config: { rateLimit: { max: 240, timeWindow: '1 minute' } },
+    },
     async (req) => {
       const { payload } = parse(ScanBodySchema, req.body);
       return scan(ctx, payload, req.admin!, req.ip);
@@ -35,29 +38,43 @@ export async function adminAttendanceRoutes(app: FastifyInstance) {
     return manualCheckin(ctx, body.attendeeId, body.reason, req.admin!, req.ip);
   });
 
-  app.get('/admin/attendance', { preHandler: requireAdmin() }, async () => ({ items: await attendanceRows(ctx) }));
+  app.get('/admin/attendance', { preHandler: requireAdmin() }, async () => ({
+    items: await attendanceRows(ctx),
+  }));
 
-  app.get('/admin/attendance/export', { preHandler: requireAdmin('superadmin') }, async (req, reply) => {
-    const { format } = parse(z.object({ format: z.enum(['csv', 'xlsx']).default('csv') }), req.query);
-    const rows = await attendanceRows(ctx);
-    const event = await ctx.event();
-    const stamp = new Date(ctx.now()).toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    const base = `${event.slug}-attendance-${stamp}`;
-    await audit(ctx.prisma, {
-      actorType: 'admin',
-      actorId: req.admin!.id,
-      actorLabel: req.admin!.email,
-      action: 'attendance.export',
-      data: { format, rows: rows.length },
-      ip: req.ip,
-    });
-    if (format === 'xlsx') {
+  app.get(
+    '/admin/attendance/export',
+    { preHandler: requireAdmin('superadmin') },
+    async (req, reply) => {
+      const { format } = parse(
+        z.object({ format: z.enum(['csv', 'xlsx']).default('csv') }),
+        req.query,
+      );
+      const rows = await attendanceRows(ctx);
+      const event = await ctx.event();
+      const stamp = new Date(ctx.now()).toISOString().slice(0, 16).replace(/[:T]/g, '-');
+      const base = `${event.slug}-attendance-${stamp}`;
+      await audit(ctx.prisma, {
+        actorType: 'admin',
+        actorId: req.admin!.id,
+        actorLabel: req.admin!.email,
+        action: 'attendance.export',
+        data: { format, rows: rows.length },
+        ip: req.ip,
+      });
+      if (format === 'xlsx') {
+        reply
+          .header(
+            'content-type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          )
+          .header('content-disposition', `attachment; filename="${base}.xlsx"`);
+        return reply.send(await toXlsx(rows, COLUMNS, 'Attendance'));
+      }
       reply
-        .header('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        .header('content-disposition', `attachment; filename="${base}.xlsx"`);
-      return reply.send(await toXlsx(rows, COLUMNS, 'Attendance'));
-    }
-    reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${base}.csv"`);
-    return reply.send(toCsv(rows, COLUMNS));
-  });
+        .header('content-type', 'text/csv; charset=utf-8')
+        .header('content-disposition', `attachment; filename="${base}.csv"`);
+      return reply.send(toCsv(rows, COLUMNS));
+    },
+  );
 }

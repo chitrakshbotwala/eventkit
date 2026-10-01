@@ -24,7 +24,15 @@ export function setAutoLaunch(enabled: boolean) {
       mkdirSync(join(homedir(), '.config', 'autostart'), { recursive: true });
       writeFileSync(
         LINUX_FILE,
-        ['[Desktop Entry]', 'Type=Application', 'Name=EventKit', `Exec="${exe}" --hidden`, 'X-GNOME-Autostart-enabled=true', 'NoDisplay=false', ''].join('\n'),
+        [
+          '[Desktop Entry]',
+          'Type=Application',
+          'Name=EventKit',
+          `Exec="${exe}" --hidden`,
+          'X-GNOME-Autostart-enabled=true',
+          'NoDisplay=false',
+          '',
+        ].join('\n'),
       );
       return;
     }

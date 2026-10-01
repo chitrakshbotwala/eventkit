@@ -11,7 +11,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: (count, err) => !(err instanceof ApiError && err.status > 0 && err.status < 500) && count < 2,
+      retry: (count, err) =>
+        !(err instanceof ApiError && err.status > 0 && err.status < 500) && count < 2,
     },
   },
 });

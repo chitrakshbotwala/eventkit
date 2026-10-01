@@ -12,7 +12,9 @@ function usableAddress(a: NetworkInterfaceInfo): boolean {
 }
 
 /** Names of physical-looking interfaces that currently hold a usable address. */
-export function activeInterfaces(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces()): string[] {
+export function activeInterfaces(
+  ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces(),
+): string[] {
   const out: string[] = [];
   for (const [name, addrs] of Object.entries(ifaces)) {
     if (!addrs || VIRTUAL.test(name)) continue;
@@ -24,7 +26,8 @@ export function activeInterfaces(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = n
 /** True for loopback/private/link-local hosts (a LAN server does not prove internet access). */
 export function isPrivateHost(host: string): boolean {
   const h = host.replace(/^\[|\]$/g, '').toLowerCase();
-  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.lan') || h.endsWith('.internal')) return true;
+  if (h === 'localhost' || h.endsWith('.local') || h.endsWith('.lan') || h.endsWith('.internal'))
+    return true;
   if (/^127\.|^10\.|^192\.168\.|^169\.254\.|^0\./.test(h)) return true;
   const m = /^172\.(\d+)\./.exec(h);
   if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true;
@@ -41,7 +44,10 @@ export interface Probe {
 }
 
 export interface ProbeDeps {
-  fetch: (url: string, init: { method: string; redirect: 'manual'; signal: AbortSignal; cache: 'no-store' }) => Promise<Response>;
+  fetch: (
+    url: string,
+    init: { method: string; redirect: 'manual'; signal: AbortSignal; cache: 'no-store' },
+  ) => Promise<Response>;
   serverUrl: string;
   timeoutMs?: number;
   /** Injectable for tests. */
@@ -59,7 +65,13 @@ async function httpProbe(deps: ProbeDeps, url: string, expect204 = false): Promi
     });
     await res.body?.cancel().catch(() => undefined);
     // ANY HTTP answer means packets reached a network beyond this laptop (captive portals included).
-    return { target: url, ok: true, status: res.status, ms: Date.now() - t0, captive: expect204 ? res.status !== 204 : undefined };
+    return {
+      target: url,
+      ok: true,
+      status: res.status,
+      ms: Date.now() - t0,
+      captive: expect204 ? res.status !== 204 : undefined,
+    };
   } catch {
     return { target: url, ok: false, ms: Date.now() - t0 };
   }
@@ -106,11 +118,19 @@ export async function probeReachability(deps: ProbeDeps): Promise<ProbeResult> {
   ]);
   const serverPublic = !isPrivateHost(new URL(deps.serverUrl).hostname);
   const internet =
-    gstatic.ok || gstaticHttp.ok || cloudflare.ok || tcp1.ok || tcp2.ok || (server.ok && serverPublic);
+    gstatic.ok ||
+    gstaticHttp.ok ||
+    cloudflare.ok ||
+    tcp1.ok ||
+    tcp2.ok ||
+    (server.ok && serverPublic);
   return {
     internet,
     serverReachable: server.ok,
     captive: Boolean((gstatic.ok && gstatic.captive) || (gstaticHttp.ok && gstaticHttp.captive)),
-    probes: [gstatic, gstaticHttp, cloudflare, server, tcp1, tcp2].map((p) => ({ ...p, target: p.target.slice(0, 200) })),
+    probes: [gstatic, gstaticHttp, cloudflare, server, tcp1, tcp2].map((p) => ({
+      ...p,
+      target: p.target.slice(0, 200),
+    })),
   };
 }

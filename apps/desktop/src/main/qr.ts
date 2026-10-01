@@ -16,7 +16,8 @@ export async function currentQr(engine: SetupEngine): Promise<QrView> {
   const profile = auth.profile;
   const checkedIn = Boolean(profile?.checkedInAt);
   if (!profile) return { visible: false, reason: 'Sign in first.', checkedIn };
-  if (engine.isRunning && !engine.isComplete) return { visible: false, reason: 'Setup is running…', checkedIn };
+  if (engine.isRunning && !engine.isComplete)
+    return { visible: false, reason: 'Setup is running…', checkedIn };
   if (!engine.isComplete) {
     const failed = engine.snapshot().components.filter((c) => c.status === 'failed');
     return {
@@ -41,6 +42,16 @@ export async function currentQr(engine: SetupEngine): Promise<QrView> {
   const now = Date.now();
   const window = currentWindow(now, api.serverOffsetMs);
   const payload = buildQrPayload(Buffer.from(secret, 'base64'), profile.id, window);
-  const dataUrl = await QRCode.toDataURL(payload, { errorCorrectionLevel: 'M', margin: 1, width: 512 });
-  return { visible: true, dataUrl, payload, expiresInMs: msUntilNextWindow(now, api.serverOffsetMs), checkedIn };
+  const dataUrl = await QRCode.toDataURL(payload, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 512,
+  });
+  return {
+    visible: true,
+    dataUrl,
+    payload,
+    expiresInMs: msUntilNextWindow(now, api.serverOffsetMs),
+    checkedIn,
+  };
 }

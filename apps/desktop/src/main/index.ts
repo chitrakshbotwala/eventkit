@@ -24,6 +24,7 @@ import { simulatedDownloader, simulatedRunners } from './setup/simulate';
 import { setAutoLaunch } from './autolaunch';
 import { Phase2Controller } from './phase2/controller';
 import { createTray, setTrayStatus } from './tray';
+import { startAutoUpdate } from './updater';
 import { createMainWindow, getMainWindow, hardenApp } from './window';
 import { homedir } from 'node:os';
 import { flutterBin } from './setup/paths';
@@ -108,9 +109,12 @@ function updateTray(v: Phase2View) {
   let line = 'EventKit';
   if (v.state === 'active') {
     state = v.net === 'online' ? 'bad' : v.net === 'limited' && v.mode === 'strict' ? 'warn' : 'ok';
-    line = v.net === 'online' ? 'Offline phase: ONLINE, disconnect now' : 'Offline phase: monitoring';
+    line =
+      v.net === 'online' ? 'Offline phase: ONLINE, disconnect now' : 'Offline phase: monitoring';
   } else if (v.state === 'presync') {
-    line = v.safeToDisconnect ? 'Offline phase soon: safe to disconnect' : 'Offline phase soon: syncing';
+    line = v.safeToDisconnect
+      ? 'Offline phase soon: safe to disconnect'
+      : 'Offline phase soon: syncing';
   } else if (v.state === 'ended' && v.pendingUpload > 0) {
     state = 'warn';
     line = 'Offline phase ended: reconnect to upload the log';
@@ -139,10 +143,13 @@ async function pushQr() {
 
 /** Refresh the QR exactly at each 60 s window boundary. */
 function scheduleQrTick() {
-  setTimeout(() => {
-    void pushQr();
-    scheduleQrTick();
-  }, msUntilNextWindow(Date.now(), api.serverOffsetMs) + 50);
+  setTimeout(
+    () => {
+      void pushQr();
+      scheduleQrTick();
+    },
+    msUntilNextWindow(Date.now(), api.serverOffsetMs) + 50,
+  );
 }
 
 /**
@@ -306,6 +313,7 @@ app
     powerMonitor.on('suspend', () => phase2.onSuspend());
     powerMonitor.on('resume', () => phase2.onResume());
     phase2.start();
+    startAutoUpdate({ canCheck: () => !phase2.isActive });
 
     scheduleQrTick();
     if (auth.state().signedIn) {
@@ -316,8 +324,7 @@ app
     }
     // Re-verify the toolchain every 10 minutes; refresh profile (check-in badge) every 30 s.
     setInterval(() => {
-      if (auth.state().signedIn && engine.installRoot)
-        void reverifyAndReport(false);
+      if (auth.state().signedIn && engine.installRoot) void reverifyAndReport(false);
     }, 10 * 60_000);
     setInterval(() => {
       if (auth.state().signedIn) void auth.refresh();

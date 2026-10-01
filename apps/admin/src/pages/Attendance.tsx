@@ -1,13 +1,29 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Badge, Banner, Card, Empty, Input, LinkButton, Loading, PageHeader, Table, Td, Th } from '../components/ui';
+import {
+  Badge,
+  Banner,
+  Card,
+  Empty,
+  Input,
+  LinkButton,
+  Loading,
+  PageHeader,
+  Table,
+  Td,
+  Th,
+} from '../components/ui';
 import { api, errorMessage, exportUrl } from '../lib/api';
 import { fmtDateTime } from '../lib/format';
 import { useStream } from '../lib/sse';
 
 export function AttendancePage() {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['attendance'], queryFn: api.attendance, refetchInterval: 60_000 });
+  const q = useQuery({
+    queryKey: ['attendance'],
+    queryFn: api.attendance,
+    refetchInterval: 60_000,
+  });
   const [filter, setFilter] = useState('');
   const [method, setMethod] = useState<'all' | 'qr' | 'manual'>('all');
 
@@ -16,10 +32,14 @@ export function AttendancePage() {
   });
 
   const rows = useMemo(() => {
-    const items = [...(q.data?.items ?? [])].sort((a, b) => b.checkedInAt.localeCompare(a.checkedInAt));
+    const items = [...(q.data?.items ?? [])].sort((a, b) =>
+      b.checkedInAt.localeCompare(a.checkedInAt),
+    );
     const f = filter.trim().toLowerCase();
     return items.filter(
-      (r) => (method === 'all' || r.method === method) && (!f || r.name.toLowerCase().includes(f) || r.email.includes(f)),
+      (r) =>
+        (method === 'all' || r.method === method) &&
+        (!f || r.name.toLowerCase().includes(f) || r.email.includes(f)),
     );
   }, [q.data, filter, method]);
 
@@ -44,8 +64,19 @@ export function AttendancePage() {
       />
       <Card>
         <div className="-mt-1 mb-4 flex flex-wrap gap-3">
-          <Input type="search" aria-label="Filter attendance" placeholder="Filter by name or email…" value={filter} onChange={(e) => setFilter(e.target.value)} className="max-w-sm" />
-          <div className="flex rounded-lg ring-1 ring-slate-300 dark:ring-slate-700" role="group" aria-label="Method">
+          <Input
+            type="search"
+            aria-label="Filter attendance"
+            placeholder="Filter by name or email…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="max-w-sm"
+          />
+          <div
+            className="flex rounded-lg ring-1 ring-slate-300 dark:ring-slate-700"
+            role="group"
+            aria-label="Method"
+          >
             {(['all', 'qr', 'manual'] as const).map((m) => (
               <button
                 key={m}
@@ -64,7 +95,9 @@ export function AttendancePage() {
         ) : q.error ? (
           <Banner tone="error">{errorMessage(q.error)}</Banner>
         ) : rows.length === 0 ? (
-          <Empty title="No check-ins yet">{total ? 'Nothing matches the filter.' : 'Scanned attendees appear here.'}</Empty>
+          <Empty title="No check-ins yet">
+            {total ? 'Nothing matches the filter.' : 'Scanned attendees appear here.'}
+          </Empty>
         ) : (
           <div className="mt-5">
             <Table>
@@ -88,11 +121,15 @@ export function AttendancePage() {
                     </Td>
                     <Td className="whitespace-nowrap tabular-nums">{fmtDateTime(r.checkedInAt)}</Td>
                     <Td>
-                      <Badge tone={r.method === 'qr' ? 'green' : 'amber'}>{r.method === 'qr' ? 'QR' : 'Manual'}</Badge>
+                      <Badge tone={r.method === 'qr' ? 'green' : 'amber'}>
+                        {r.method === 'qr' ? 'QR' : 'Manual'}
+                      </Badge>
                     </Td>
                     <Td>
                       <div>{r.scannerName ?? '—'}</div>
-                      {r.scannerEmail && <div className="text-xs text-slate-500">{r.scannerEmail}</div>}
+                      {r.scannerEmail && (
+                        <div className="text-xs text-slate-500">{r.scannerEmail}</div>
+                      )}
                     </Td>
                     <Td className="text-xs text-slate-600 dark:text-slate-300">{r.reason ?? ''}</Td>
                   </tr>

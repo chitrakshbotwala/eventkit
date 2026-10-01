@@ -64,6 +64,12 @@ Decisions taken without asking. Each one is small and can be reversed.
 - **Status priority:** tampered > violation > monitoring_gap > unverified > warning > compliant. A live violation is final even before the log is uploaded. "Compliant" requires a verified uploaded log that covers the whole window.
 - **Auto-launch** uses `setLoginItemSettings` on Windows and macOS and an XDG autostart `.desktop` file on Linux. It is registered after login. During phase 2, closing the window hides the app to the tray.
 
+## Packaging and updates
+
+- **Installers.** Windows gets one NSIS one-click installer: per-user, no UAC, **x64 only**. Windows on Arm runs it, and the x64 toolchain it installs, under emulation, and a dual-arch installer would double the download. macOS gets a dmg plus a zip for each of arm64 and x64. Linux gets an AppImage and a deb.
+- **Updates come from the event server**, not GitHub. The app points electron-updater at `<server>/updates/` at runtime, so the update feed is the same HTTPS origin the app already trusts. No public release hosting is needed, and organizers decide when an update goes live by copying files. The deb package does not self-update. Updates are never checked during phase 2.
+- **Electron fuses** are flipped at package time: no `RunAsNode`, no `NODE_OPTIONS`, no `--inspect`, and asar integrity validation is on. Chromium's `--remote-debugging-port` cannot be disabled this way, which is one more reason client attestation is evidence rather than proof (see README).
+
 ## Not attempted
 
 - Real code signing and notarization. The CI has the hooks, and the README documents the secrets.

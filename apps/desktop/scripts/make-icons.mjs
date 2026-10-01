@@ -63,10 +63,17 @@ function appIcon(u, v) {
   const dy = Math.max(0, Math.abs(v - 0.5) - (0.5 - r) + 0.04);
   if (Math.hypot(dx, dy) > r) return [0, 0, 0, 0];
   const onLine = (ax, ay, bx, by, w) => {
-    const t = Math.max(0, Math.min(1, ((u - ax) * (bx - ax) + (v - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+    const t = Math.max(
+      0,
+      Math.min(
+        1,
+        ((u - ax) * (bx - ax) + (v - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2),
+      ),
+    );
     return Math.hypot(u - (ax + t * (bx - ax)), v - (ay + t * (by - ay))) < w;
   };
-  if (onLine(0.28, 0.52, 0.44, 0.68, 0.055) || onLine(0.44, 0.68, 0.74, 0.34, 0.055)) return [255, 255, 255, 255];
+  if (onLine(0.28, 0.52, 0.44, 0.68, 0.055) || onLine(0.44, 0.68, 0.74, 0.34, 0.055))
+    return [255, 255, 255, 255];
   return [Math.round(20 + 30 * v), Math.round(110 + 60 * (1 - v)), Math.round(220 + 30 * u), 255];
 }
 

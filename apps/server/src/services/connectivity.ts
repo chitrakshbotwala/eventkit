@@ -10,9 +10,26 @@ import { KeyedMutex } from '../lib/util';
 /** Realtime and full-log uploads from one device may race; ingest them one at a time. */
 const deviceLock = new KeyedMutex();
 
-const NOTABLE = new Set(['online', 'limited', 'offline', 'app_start', 'app_stop', 'phase_start', 'phase_end', 'clock_anomaly', 'suspend', 'resume']);
+const NOTABLE = new Set([
+  'online',
+  'limited',
+  'offline',
+  'app_start',
+  'app_stop',
+  'phase_start',
+  'phase_end',
+  'clock_anomaly',
+  'suspend',
+  'resume',
+]);
 
-function row(attendee: Attendee, device: Device, e: LogEntry, source: 'realtime' | 'uploaded_log', valid: boolean) {
+function row(
+  attendee: Attendee,
+  device: Device,
+  e: LogEntry,
+  source: 'realtime' | 'uploaded_log',
+  valid: boolean,
+) {
   return {
     attendeeId: attendee.id,
     deviceId: device.id,
@@ -32,7 +49,13 @@ function row(attendee: Attendee, device: Device, e: LogEntry, source: 'realtime'
   };
 }
 
-function publish(ctx: AppContext, attendee: Attendee, device: Device, e: LogEntry, source: 'realtime' | 'uploaded_log') {
+function publish(
+  ctx: AppContext,
+  attendee: Attendee,
+  device: Device,
+  e: LogEntry,
+  source: 'realtime' | 'uploaded_log',
+) {
   if (!NOTABLE.has(e.type)) return;
   ctx.hub.publish({
     type: 'connectivity',
@@ -82,7 +105,9 @@ async function ingestRealtimeLocked(
     if (exists) {
       if (exists.hash !== e.hash) errors.push(`seq ${e.seq}: conflicts with an earlier copy`);
     } else {
-      await ctx.prisma.connectivityEvent.create({ data: row(attendee, device, e, 'realtime', !err) });
+      await ctx.prisma.connectivityEvent.create({
+        data: row(attendee, device, e, 'realtime', !err),
+      });
       accepted++;
       publish(ctx, attendee, device, e, 'realtime');
     }
@@ -181,7 +206,9 @@ async function ingestLogLocked(
   // A log that was ever found tampered stays tampered.
   if (prev && !prev.chainValid) {
     data.chainValid = false;
-    data.errors = JSON.stringify([...JSON.parse(prev.errors) as string[], ...errors].slice(0, 50));
+    data.errors = JSON.stringify(
+      [...(JSON.parse(prev.errors) as string[]), ...errors].slice(0, 50),
+    );
   }
   await ctx.prisma.connectivityLog.upsert({
     where: { deviceId_logId: { deviceId: device.id, logId: body.logId } },
@@ -189,7 +216,8 @@ async function ingestLogLocked(
     update: data,
   });
 
-  for (const e of entries.slice(-20)) if (!bySeq.has(e.seq)) publish(ctx, attendee, device, e, 'uploaded_log');
+  for (const e of entries.slice(-20))
+    if (!bySeq.has(e.seq)) publish(ctx, attendee, device, e, 'uploaded_log');
   await audit(ctx.prisma, {
     actorType: 'attendee',
     actorId: attendee.id,

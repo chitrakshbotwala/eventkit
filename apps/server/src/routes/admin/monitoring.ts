@@ -44,7 +44,10 @@ export async function adminMonitoringRoutes(app: FastifyInstance) {
   }));
 
   app.get('/admin/monitoring/feed', { preHandler: superadmin }, async (req) => {
-    const { limit } = parse(z.object({ limit: z.coerce.number().int().min(1).max(1000).default(200) }), req.query);
+    const { limit } = parse(
+      z.object({ limit: z.coerce.number().int().min(1).max(1000).default(200) }),
+      req.query,
+    );
     const event = await ctx.event();
     const rows = await ctx.prisma.connectivityEvent.findMany({
       where: { attendee: { eventId: event.id }, type: { not: 'heartbeat' } },
@@ -68,7 +71,10 @@ export async function adminMonitoringRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/monitoring/export', { preHandler: superadmin }, async (req, reply) => {
-    const { format } = parse(z.object({ format: z.enum(['csv', 'xlsx']).default('csv') }), req.query);
+    const { format } = parse(
+      z.object({ format: z.enum(['csv', 'xlsx']).default('csv') }),
+      req.query,
+    );
     const rows = await computeCompliance(ctx, { fresh: true });
     const event = await ctx.event();
     const base = `${event.slug}-phase2-compliance-${new Date(ctx.now()).toISOString().slice(0, 16).replace(/[:T]/g, '-')}`;
@@ -86,7 +92,9 @@ export async function adminMonitoringRoutes(app: FastifyInstance) {
         .header('content-disposition', `attachment; filename="${base}.xlsx"`);
       return reply.send(await toXlsx(rows, COLUMNS, 'Compliance'));
     }
-    reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="${base}.csv"`);
+    reply
+      .header('content-type', 'text/csv; charset=utf-8')
+      .header('content-disposition', `attachment; filename="${base}.csv"`);
     return reply.send(toCsv(rows, COLUMNS));
   });
 }

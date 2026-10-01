@@ -30,7 +30,12 @@ async function existing(ctx: AppContext, attendeeId: string) {
  * Idempotent: the Attendance row is unique per attendee, so concurrent or
  * repeated scans never create a second record.
  */
-export async function scan(ctx: AppContext, payload: string, scanner: AdminUser, ip: string): Promise<ScanResponse> {
+export async function scan(
+  ctx: AppContext,
+  payload: string,
+  scanner: AdminUser,
+  ip: string,
+): Promise<ScanResponse> {
   const now = ctx.now();
   const respond = async (
     result: ScanResponse['result'],
@@ -45,7 +50,14 @@ export async function scan(ctx: AppContext, payload: string, scanner: AdminUser,
       target: attendee?.id ?? null,
       ip,
     });
-    return { result, message: MESSAGES[result], attendee, checkedInAt: null, checkedInBy: null, ...extra };
+    return {
+      result,
+      message: MESSAGES[result],
+      attendee,
+      checkedInAt: null,
+      checkedInBy: null,
+      ...extra,
+    };
   };
 
   const qr = parseQrPayload(payload);
@@ -71,11 +83,23 @@ export async function scan(ctx: AppContext, payload: string, scanner: AdminUser,
 
   try {
     const row = await ctx.prisma.attendance.create({
-      data: { eventId: event.id, attendeeId: a.id, method: 'qr', scannerId: scanner.id, checkedInAt: new Date(now) },
+      data: {
+        eventId: event.id,
+        attendeeId: a.id,
+        method: 'qr',
+        scannerId: scanner.id,
+        checkedInAt: new Date(now),
+      },
     });
-    ctx.hub.publish({ type: 'checkin', data: { attendeeId: a.id, name: a.name, method: 'qr', at: row.checkedInAt.toISOString() } });
+    ctx.hub.publish({
+      type: 'checkin',
+      data: { attendeeId: a.id, name: a.name, method: 'qr', at: row.checkedInAt.toISOString() },
+    });
     publishCounters(ctx);
-    return respond('valid', who, { checkedInAt: row.checkedInAt.toISOString(), checkedInBy: scanner.name });
+    return respond('valid', who, {
+      checkedInAt: row.checkedInAt.toISOString(),
+      checkedInBy: scanner.name,
+    });
   } catch (err) {
     if (!isUniqueViolation(err)) throw err;
     const again = await existing(ctx, a.id);
@@ -111,7 +135,14 @@ export async function manualCheckin(
   let row;
   try {
     row = await ctx.prisma.attendance.create({
-      data: { eventId: event.id, attendeeId: a.id, method: 'manual', scannerId: admin.id, reason, checkedInAt: new Date(ctx.now()) },
+      data: {
+        eventId: event.id,
+        attendeeId: a.id,
+        method: 'manual',
+        scannerId: admin.id,
+        reason,
+        checkedInAt: new Date(ctx.now()),
+      },
     });
   } catch (err) {
     if (isUniqueViolation(err)) return manualCheckin(ctx, attendeeId, reason, admin, ip);
@@ -126,9 +157,18 @@ export async function manualCheckin(
     data: { reason },
     ip,
   });
-  ctx.hub.publish({ type: 'checkin', data: { attendeeId: a.id, name: a.name, method: 'manual', at: row.checkedInAt.toISOString() } });
+  ctx.hub.publish({
+    type: 'checkin',
+    data: { attendeeId: a.id, name: a.name, method: 'manual', at: row.checkedInAt.toISOString() },
+  });
   publishCounters(ctx);
-  return { result: 'valid', message: 'Checked in manually', attendee: who, checkedInAt: row.checkedInAt.toISOString(), checkedInBy: admin.name };
+  return {
+    result: 'valid',
+    message: 'Checked in manually',
+    attendee: who,
+    checkedInAt: row.checkedInAt.toISOString(),
+    checkedInBy: admin.name,
+  };
 }
 
 export async function attendanceRows(ctx: AppContext): Promise<AttendanceRow[]> {

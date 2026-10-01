@@ -1,9 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { PhaseMode, Schedule } from '@eventkit/shared';
-import { Badge, Banner, Button, Card, Field, Input, Loading, Modal, PageHeader, Select, Spinner } from '../components/ui';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Field,
+  Input,
+  Loading,
+  Modal,
+  PageHeader,
+  Select,
+  Spinner,
+} from '../components/ui';
 import { api, errorMessage } from '../lib/api';
-import { allTimeZones, fmtCountdown, fmtDateTime, isoToLocalInput, localInputToIso, tzLabel } from '../lib/format';
+import {
+  allTimeZones,
+  fmtCountdown,
+  fmtDateTime,
+  isoToLocalInput,
+  localInputToIso,
+  tzLabel,
+} from '../lib/format';
 import { useStream } from '../lib/sse';
 
 type State = 'none' | 'scheduled' | 'presync' | 'active' | 'ended';
@@ -18,7 +37,10 @@ function phaseState(s: Schedule, now: number): State {
   return 'scheduled';
 }
 
-const STATE_META: Record<State, { label: string; tone: 'gray' | 'blue' | 'amber' | 'red' | 'green' }> = {
+const STATE_META: Record<
+  State,
+  { label: string; tone: 'gray' | 'blue' | 'amber' | 'red' | 'green' }
+> = {
   none: { label: 'Not scheduled', tone: 'gray' },
   scheduled: { label: 'Scheduled', tone: 'blue' },
   presync: { label: 'Final sync (attendees may disconnect)', tone: 'amber' },
@@ -50,9 +72,16 @@ export function Phase2Page() {
     if (e.type === 'schedule') void qc.invalidateQueries({ queryKey: ['schedule'] });
   });
 
-  const setData = (d: { schedule: Schedule; serverTime: number }) => qc.setQueryData(['schedule'], d);
-  const startNow = useMutation({ mutationFn: api.startNow, onSuccess: (d) => (setData(d), setConfirm(null)) });
-  const endNow = useMutation({ mutationFn: api.endNow, onSuccess: (d) => (setData(d), setConfirm(null)) });
+  const setData = (d: { schedule: Schedule; serverTime: number }) =>
+    qc.setQueryData(['schedule'], d);
+  const startNow = useMutation({
+    mutationFn: api.startNow,
+    onSuccess: (d) => (setData(d), setConfirm(null)),
+  });
+  const endNow = useMutation({
+    mutationFn: api.endNow,
+    onSuccess: (d) => (setData(d), setConfirm(null)),
+  });
 
   if (q.isLoading) return <Loading />;
   if (q.error) return <Banner tone="error">{errorMessage(q.error)}</Banner>;
@@ -64,25 +93,39 @@ export function Phase2Page() {
 
   return (
     <>
-      <PageHeader title="Phase 2 control" subtitle="Schedule the offline phase. Attendee apps sync this every minute while online." />
+      <PageHeader
+        title="Phase 2 control"
+        subtitle="Schedule the offline phase. Attendee apps sync this every minute while online."
+      />
 
-      <div className={`mb-6 rounded-xl p-6 ring-1 ${state === 'active' ? 'bg-red-600 text-white ring-red-700' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-800'}`}>
+      <div
+        className={`mb-6 rounded-xl p-6 ring-1 ${state === 'active' ? 'bg-red-600 text-white ring-red-700' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-800'}`}
+      >
         <div className="flex flex-wrap items-center justify-between gap-6">
           <div>
-            <div className={`text-xs font-semibold uppercase tracking-wide ${state === 'active' ? 'text-red-100' : 'text-slate-500'}`}>Current state</div>
+            <div
+              className={`text-xs font-semibold uppercase tracking-wide ${state === 'active' ? 'text-red-100' : 'text-slate-500'}`}
+            >
+              Current state
+            </div>
             <div className="mt-1 flex items-center gap-2 text-2xl font-semibold">
               {state === 'active' ? meta.label : <Badge tone={meta.tone}>{meta.label}</Badge>}
             </div>
-            <div className={`mt-2 text-sm ${state === 'active' ? 'text-red-100' : 'text-slate-500'}`}>
+            <div
+              className={`mt-2 text-sm ${state === 'active' ? 'text-red-100' : 'text-slate-500'}`}
+            >
               {start && `Start ${fmtDateTime(s.startAt, s.timezone)}`}
-              {end && ` · End ${fmtDateTime(s.endAt, s.timezone)}`} {s.startAt && `(${s.timezone})`} · {s.mode} mode · grace {s.graceSeconds}s · v{s.version}
+              {end && ` · End ${fmtDateTime(s.endAt, s.timezone)}`} {s.startAt && `(${s.timezone})`}{' '}
+              · {s.mode} mode · grace {s.graceSeconds}s · v{s.version}
             </div>
           </div>
           <div className="text-right">
             {(state === 'scheduled' || state === 'presync') && start && (
               <>
                 <div className="text-xs uppercase tracking-wide text-slate-500">Starts in</div>
-                <div className="text-5xl font-semibold tabular-nums">{fmtCountdown(start - now)}</div>
+                <div className="text-5xl font-semibold tabular-nums">
+                  {fmtCountdown(start - now)}
+                </div>
               </>
             )}
             {state === 'active' && end && (
@@ -94,10 +137,20 @@ export function Phase2Page() {
           </div>
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button size="lg" variant={state === 'active' ? 'secondary' : 'danger'} disabled={state === 'active'} onClick={() => setConfirm('start')}>
+          <Button
+            size="lg"
+            variant={state === 'active' ? 'secondary' : 'danger'}
+            disabled={state === 'active'}
+            onClick={() => setConfirm('start')}
+          >
             Start now
           </Button>
-          <Button size="lg" variant={state === 'active' ? 'success' : 'secondary'} disabled={state !== 'active'} onClick={() => setConfirm('end')}>
+          <Button
+            size="lg"
+            variant={state === 'active' ? 'success' : 'secondary'}
+            disabled={state !== 'active'}
+            onClick={() => setConfirm('end')}
+          >
             End now
           </Button>
         </div>
@@ -113,7 +166,11 @@ export function Phase2Page() {
           <>
             <Button onClick={() => setConfirm(null)}>Cancel</Button>
             {confirm === 'start' ? (
-              <Button variant="danger" disabled={startNow.isPending} onClick={() => startNow.mutate()}>
+              <Button
+                variant="danger"
+                disabled={startNow.isPending}
+                onClick={() => startNow.mutate()}
+              >
                 {startNow.isPending && <Spinner />} Start now
               </Button>
             ) : (
@@ -139,12 +196,22 @@ export function Phase2Page() {
   );
 }
 
-function ScheduleForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (d: { schedule: Schedule; serverTime: number }) => void }) {
+function ScheduleForm({
+  schedule,
+  onSaved,
+}: {
+  schedule: Schedule;
+  onSaved: (d: { schedule: Schedule; serverTime: number }) => void;
+}) {
   const zones = useMemo(allTimeZones, []);
   const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [tz, setTz] = useState(schedule.timezone || browserTz);
-  const [startLocal, setStartLocal] = useState(isoToLocalInput(schedule.startAt, schedule.timezone || browserTz));
-  const [endLocal, setEndLocal] = useState(isoToLocalInput(schedule.endAt, schedule.timezone || browserTz));
+  const [startLocal, setStartLocal] = useState(
+    isoToLocalInput(schedule.startAt, schedule.timezone || browserTz),
+  );
+  const [endLocal, setEndLocal] = useState(
+    isoToLocalInput(schedule.endAt, schedule.timezone || browserTz),
+  );
   const [mode, setMode] = useState<PhaseMode>(schedule.mode);
   const [grace, setGrace] = useState(String(schedule.graceSeconds));
   const [heartbeat, setHeartbeat] = useState(String(schedule.heartbeatSeconds));
@@ -159,7 +226,16 @@ function ScheduleForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (d: 
     setMode(schedule.mode);
     setGrace(String(schedule.graceSeconds));
     setHeartbeat(String(schedule.heartbeatSeconds));
-  }, [schedule.version, schedule.timezone, schedule.startAt, schedule.endAt, schedule.mode, schedule.graceSeconds, schedule.heartbeatSeconds, browserTz]);
+  }, [
+    schedule.version,
+    schedule.timezone,
+    schedule.startAt,
+    schedule.endAt,
+    schedule.mode,
+    schedule.graceSeconds,
+    schedule.heartbeatSeconds,
+    browserTz,
+  ]);
 
   const save = useMutation({
     mutationFn: () =>
@@ -190,7 +266,10 @@ function ScheduleForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (d: 
   return (
     <Card title="Schedule">
       <form onSubmit={submit} className="grid gap-5 md:grid-cols-2">
-        <Field label="Time zone" hint={`${tzLabel(tz)}. Times below are wall-clock times in this zone.`}>
+        <Field
+          label="Time zone"
+          hint={`${tzLabel(tz)}. Times below are wall-clock times in this zone.`}
+        >
           {(id) => (
             <Select id={id} value={tz} onChange={(e) => setTz(e.target.value)}>
               {zones.map((z) => (
@@ -201,7 +280,10 @@ function ScheduleForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (d: 
             </Select>
           )}
         </Field>
-        <Field label="Mode" hint="Strict also warns when a network interface is up without internet.">
+        <Field
+          label="Mode"
+          hint="Strict also warns when a network interface is up without internet."
+        >
           {(id) => (
             <Select id={id} value={mode} onChange={(e) => setMode(e.target.value as PhaseMode)}>
               <option value="strict">Strict</option>
@@ -209,17 +291,62 @@ function ScheduleForm({ schedule, onSaved }: { schedule: Schedule; onSaved: (d: 
             </Select>
           )}
         </Field>
-        <Field label="Start" hint={startIso ? `UTC ${startIso.replace('.000Z', 'Z')}` : 'Leave empty to unschedule'}>
-          {(id) => <Input id={id} type="datetime-local" value={startLocal} onChange={(e) => setStartLocal(e.target.value)} />}
+        <Field
+          label="Start"
+          hint={startIso ? `UTC ${startIso.replace('.000Z', 'Z')}` : 'Leave empty to unschedule'}
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="datetime-local"
+              value={startLocal}
+              onChange={(e) => setStartLocal(e.target.value)}
+            />
+          )}
         </Field>
-        <Field label="End" error={invalid ? 'End must be after start' : null} hint={endIso ? `UTC ${endIso.replace('.000Z', 'Z')}` : undefined}>
-          {(id) => <Input id={id} type="datetime-local" value={endLocal} onChange={(e) => setEndLocal(e.target.value)} />}
+        <Field
+          label="End"
+          error={invalid ? 'End must be after start' : null}
+          hint={endIso ? `UTC ${endIso.replace('.000Z', 'Z')}` : undefined}
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="datetime-local"
+              value={endLocal}
+              onChange={(e) => setEndLocal(e.target.value)}
+            />
+          )}
         </Field>
-        <Field label="Grace period (seconds)" hint="Time after start before being online counts as a violation.">
-          {(id) => <Input id={id} type="number" min={0} max={3600} value={grace} onChange={(e) => setGrace(e.target.value)} />}
+        <Field
+          label="Grace period (seconds)"
+          hint="Time after start before being online counts as a violation."
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="number"
+              min={0}
+              max={3600}
+              value={grace}
+              onChange={(e) => setGrace(e.target.value)}
+            />
+          )}
         </Field>
-        <Field label="Heartbeat (seconds)" hint="How often the app logs a heartbeat. Gaps longer than 2× + 30 s are flagged.">
-          {(id) => <Input id={id} type="number" min={10} max={600} value={heartbeat} onChange={(e) => setHeartbeat(e.target.value)} />}
+        <Field
+          label="Heartbeat (seconds)"
+          hint="How often the app logs a heartbeat. Gaps longer than 2× + 30 s are flagged."
+        >
+          {(id) => (
+            <Input
+              id={id}
+              type="number"
+              min={10}
+              max={600}
+              value={heartbeat}
+              onChange={(e) => setHeartbeat(e.target.value)}
+            />
+          )}
         </Field>
         <div className="flex items-center gap-3 md:col-span-2">
           <Button variant="primary" type="submit" disabled={save.isPending || invalid}>

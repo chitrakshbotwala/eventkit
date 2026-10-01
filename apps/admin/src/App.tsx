@@ -45,11 +45,15 @@ function Shell({ children }: { children: ReactNode }) {
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center gap-2 px-5 py-5">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">EK</div>
+            <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">
+              EK
+            </div>
             <div>
               <div className="text-sm font-semibold">EventKit Admin</div>
               <div className="flex items-center gap-1 text-xs text-slate-500">
-                <span className={`h-1.5 w-1.5 rounded-full ${live ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${live ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                />
                 {live ? 'Live' : 'Connecting…'}
               </div>
             </div>
@@ -81,19 +85,35 @@ function Shell({ children }: { children: ReactNode }) {
             <div className="truncate text-xs text-slate-500">
               {admin?.email} · {admin?.role}
             </div>
-            <button type="button" onClick={() => void logout()} className="mt-2 text-xs font-medium text-brand-600 hover:underline">
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className="mt-2 text-xs font-medium text-brand-600 hover:underline"
+            >
               Sign out
             </button>
           </div>
         </div>
       </aside>
-      {open && <div className="fixed inset-0 z-10 bg-slate-950/30 md:hidden" onClick={() => setOpen(false)} />}
+      {open && (
+        <div
+          className="fixed inset-0 z-10 bg-slate-950/30 md:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 md:hidden dark:border-slate-800 dark:bg-slate-900">
-          <button type="button" onClick={() => setOpen(true)} className="rounded p-1 text-lg" aria-label="Open menu">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="rounded p-1 text-lg"
+            aria-label="Open menu"
+          >
             ☰
           </button>
-          <span className="text-sm font-semibold">{items.find((i) => i.to === location.pathname)?.label ?? 'EventKit'}</span>
+          <span className="text-sm font-semibold">
+            {items.find((i) => i.to === location.pathname)?.label ?? 'EventKit'}
+          </span>
         </div>
         <main className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">{children}</div>
@@ -114,23 +134,70 @@ export function App() {
 
   if (loading) return <Loading label="Loading admin…" />;
   if (!admin) {
-    if (location.pathname !== '/login') return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    if (location.pathname !== '/login')
+      return <Navigate to="/login" replace state={{ from: location.pathname }} />;
     return <LoginPage />;
   }
-  if (location.pathname === '/login') return <Navigate to={admin.role === 'superadmin' ? '/' : '/scanner'} replace />;
+  if (location.pathname === '/login')
+    return <Navigate to={admin.role === 'superadmin' ? '/' : '/scanner'} replace />;
 
   return (
     <Shell>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route path="/" element={<RequireSuperadmin><OverviewPage /></RequireSuperadmin>} />
-          <Route path="/attendees" element={<RequireSuperadmin><AttendeesPage /></RequireSuperadmin>} />
+          <Route
+            path="/"
+            element={
+              <RequireSuperadmin>
+                <OverviewPage />
+              </RequireSuperadmin>
+            }
+          />
+          <Route
+            path="/attendees"
+            element={
+              <RequireSuperadmin>
+                <AttendeesPage />
+              </RequireSuperadmin>
+            }
+          />
           <Route path="/scanner" element={<ScannerPage />} />
-          <Route path="/attendance" element={<RequireSuperadmin><AttendancePage /></RequireSuperadmin>} />
-          <Route path="/phase2" element={<RequireSuperadmin><Phase2Page /></RequireSuperadmin>} />
-          <Route path="/monitoring" element={<RequireSuperadmin><MonitoringPage /></RequireSuperadmin>} />
-          <Route path="/settings" element={<RequireSuperadmin><SettingsPage /></RequireSuperadmin>} />
-          <Route path="*" element={<Navigate to={admin.role === 'superadmin' ? '/' : '/scanner'} replace />} />
+          <Route
+            path="/attendance"
+            element={
+              <RequireSuperadmin>
+                <AttendancePage />
+              </RequireSuperadmin>
+            }
+          />
+          <Route
+            path="/phase2"
+            element={
+              <RequireSuperadmin>
+                <Phase2Page />
+              </RequireSuperadmin>
+            }
+          />
+          <Route
+            path="/monitoring"
+            element={
+              <RequireSuperadmin>
+                <MonitoringPage />
+              </RequireSuperadmin>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequireSuperadmin>
+                <SettingsPage />
+              </RequireSuperadmin>
+            }
+          />
+          <Route
+            path="*"
+            element={<Navigate to={admin.role === 'superadmin' ? '/' : '/scanner'} replace />}
+          />
         </Routes>
       </Suspense>
     </Shell>

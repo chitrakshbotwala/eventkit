@@ -11,7 +11,13 @@ import {
 } from 'node:fs';
 import { uptime } from 'node:os';
 import { join } from 'node:path';
-import { GENESIS_HASH, LogEntrySchema, type LogEntry, type LogEntryData, type LogEventType } from '@eventkit/shared';
+import {
+  GENESIS_HASH,
+  LogEntrySchema,
+  type LogEntry,
+  type LogEntryData,
+  type LogEventType,
+} from '@eventkit/shared';
 import { sealEntry } from '@eventkit/shared/node';
 import { readJson, writeJson } from '../store';
 

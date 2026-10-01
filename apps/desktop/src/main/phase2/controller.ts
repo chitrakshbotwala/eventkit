@@ -68,11 +68,17 @@ export class Phase2Controller extends EventEmitter {
 
   constructor(private readonly deps: ControllerDeps) {
     super();
-    this.log = new LocalLog(paths.file('connectivity'), () => auth.deviceKey, () => api.serverOffsetMs);
-    const stats = readJson<{ logId?: string; violations?: number; onlineMs?: number; limited?: boolean }>(
-      paths.file('phase2-stats.json'),
-      {},
+    this.log = new LocalLog(
+      paths.file('connectivity'),
+      () => auth.deviceKey,
+      () => api.serverOffsetMs,
     );
+    const stats = readJson<{
+      logId?: string;
+      violations?: number;
+      onlineMs?: number;
+      limited?: boolean;
+    }>(paths.file('phase2-stats.json'), {});
     if (stats.logId && stats.logId === this.log.current?.logId) {
       this.violationCount = stats.violations ?? 0;
       this.onlineMs = stats.onlineMs ?? 0;
@@ -128,7 +134,9 @@ export class Phase2Controller extends EventEmitter {
       this.lastSyncAt = Date.now();
       if (changed) {
         writeJson(paths.file('schedule.json'), res.schedule);
-        log.info(`schedule v${res.schedule.version}: ${res.schedule.startAt ?? '-'} -> ${res.schedule.endAt ?? '-'} (${res.schedule.mode})`);
+        log.info(
+          `schedule v${res.schedule.version}: ${res.schedule.startAt ?? '-'} -> ${res.schedule.endAt ?? '-'} (${res.schedule.mode})`,
+        );
       }
       this.emitView();
       return true;
@@ -177,8 +185,15 @@ export class Phase2Controller extends EventEmitter {
       }
       this.accumulate(now);
     }
-    if (this.log.current && (this.phase === 'ended' || this.phase === 'none' || this.phase === 'scheduled' || this.net === 'online')) {
-      if (Date.now() - this.lastUploadTry >= UPLOAD_RETRY_MS && this.log.pendingUpload > 0) void this.uploadLog();
+    if (
+      this.log.current &&
+      (this.phase === 'ended' ||
+        this.phase === 'none' ||
+        this.phase === 'scheduled' ||
+        this.net === 'online')
+    ) {
+      if (Date.now() - this.lastUploadTry >= UPLOAD_RETRY_MS && this.log.pendingUpload > 0)
+        void this.uploadLog();
     }
     this.lastTick = Date.now();
     this.emitView();
@@ -206,7 +221,10 @@ export class Phase2Controller extends EventEmitter {
       if (to === 'presync') void this.finalSync();
       if (to === 'active') {
         await this.probeNow();
-        this.log.append('phase_start', { state: this.net, scheduleVersion: this.schedule?.version });
+        this.log.append('phase_start', {
+          state: this.net,
+          scheduleVersion: this.schedule?.version,
+        });
         if (this.net === 'online') this.deps.onDisconnectNow();
       }
     } else if (this.log.isOpen) {
@@ -232,7 +250,11 @@ export class Phase2Controller extends EventEmitter {
       this.onlineRunCounted = false;
       this.saveStats();
     }
-    this.log.append(firstType, { appVersion: app.getVersion(), state: this.net, interfaces: activeInterfaces() });
+    this.log.append(firstType, {
+      appVersion: app.getVersion(),
+      state: this.net,
+      interfaces: activeInterfaces(),
+    });
     this.lastHeartbeat = Date.now();
   }
 
@@ -282,14 +304,23 @@ export class Phase2Controller extends EventEmitter {
         const prev = this.net;
         this.net = state;
         if (state !== 'online') this.onlineRunCounted = false;
-        log.info(`network: ${prev} -> ${state} [${ifaces.join(', ') || 'no interfaces'}]${res.captive ? ' (captive portal)' : ''}`);
+        log.info(
+          `network: ${prev} -> ${state} [${ifaces.join(', ') || 'no interfaces'}]${res.captive ? ' (captive portal)' : ''}`,
+        );
         if (isMonitoring(this.phase) && this.log.isOpen) {
           this.log.append(state, {
             interfaces: ifaces,
-            probes: res.probes.map((p) => ({ target: p.target, ok: p.ok, status: p.status, ms: p.ms, captive: p.captive })),
+            probes: res.probes.map((p) => ({
+              target: p.target,
+              ok: p.ok,
+              status: p.status,
+              ms: p.ms,
+              captive: p.captive,
+            })),
             hint: res.captive ? 'captive portal' : undefined,
           });
-          if (state === 'limited' && inEnforcedWindow(this.schedule, this.serverNow())) this.limitedSeen = true;
+          if (state === 'limited' && inEnforcedWindow(this.schedule, this.serverNow()))
+            this.limitedSeen = true;
           this.saveStats();
         }
       }
@@ -317,7 +348,8 @@ export class Phase2Controller extends EventEmitter {
           timeoutMs: 10_000,
         });
         this.log.markSent(batch[batch.length - 1]!.seq);
-        if (ack.errors.length) log.warn(`server flagged events: ${ack.errors.slice(0, 3).join('; ')}`);
+        if (ack.errors.length)
+          log.warn(`server flagged events: ${ack.errors.slice(0, 3).join('; ')}`);
       }
     } catch (err) {
       log.debug(`realtime flush failed: ${errMsg(err)}`);
@@ -340,7 +372,9 @@ export class Phase2Controller extends EventEmitter {
         timeoutMs: 60_000,
       });
       this.log.markUploaded(entries[entries.length - 1]!.seq);
-      log.info(`log uploaded (${entries.length} entries, chain ${ack.chainValid ? 'valid' : 'INVALID'})`);
+      log.info(
+        `log uploaded (${entries.length} entries, chain ${ack.chainValid ? 'valid' : 'INVALID'})`,
+      );
       this.emitView();
     } catch (err) {
       log.debug(`log upload failed: ${errMsg(err)}`);
@@ -372,7 +406,12 @@ export class Phase2Controller extends EventEmitter {
     const end = s?.endAt ? Date.parse(s.endAt) : null;
     let compliance: Phase2View['compliance'] = 'pending';
     if (this.phase === 'active' || this.phase === 'ended') {
-      compliance = this.violationCount > 0 ? 'violation' : this.limitedSeen && s?.mode === 'strict' ? 'warning' : 'compliant';
+      compliance =
+        this.violationCount > 0
+          ? 'violation'
+          : this.limitedSeen && s?.mode === 'strict'
+            ? 'warning'
+            : 'compliant';
     }
     return {
       state: this.phase,

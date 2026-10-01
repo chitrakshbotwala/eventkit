@@ -54,7 +54,14 @@ function report(over: Partial<ReadinessReport> = {}): ReadinessReport {
       .map((c) => ({
         id: c.id,
         status: 'verified' as const,
-        version: c.id === 'flutter' && flutter?.id === 'flutter' ? flutter.version : c.id === 'git' ? '2.51.0' : c.id === 'java' ? '17.0.16+8' : undefined,
+        version:
+          c.id === 'flutter' && flutter?.id === 'flutter'
+            ? flutter.version
+            : c.id === 'git'
+              ? '2.51.0'
+              : c.id === 'java'
+                ? '17.0.16+8'
+                : undefined,
       })),
     doctor: {
       flutterVersion: flutter?.id === 'flutter' ? flutter.version : undefined,
@@ -64,8 +71,20 @@ function report(over: Partial<ReadinessReport> = {}): ReadinessReport {
         { key: 'android', title: 'Android toolchain', status: 'ok', errors: [], warnings: [] },
         { key: 'chrome', title: 'Chrome', status: 'ok', errors: [], warnings: [] },
         { key: 'vscode', title: 'VS Code', status: 'ok', errors: [], warnings: [] },
-        { key: 'visual-studio', title: 'Visual Studio', status: 'missing', errors: ['not installed'], warnings: [] },
-        { key: 'network', title: 'Network resources', status: 'partial', errors: ['offline'], warnings: [] },
+        {
+          key: 'visual-studio',
+          title: 'Visual Studio',
+          status: 'missing',
+          errors: ['not installed'],
+          warnings: [],
+        },
+        {
+          key: 'network',
+          title: 'Network resources',
+          status: 'partial',
+          errors: ['offline'],
+          warnings: [],
+        },
       ],
     },
     ...over,
@@ -82,7 +101,12 @@ const submit = (r: ReadinessReport, key: Buffer = deviceKey) =>
 
 async function scanAs(email: string, payload: string) {
   const { cookie } = await loginAdmin(t, email);
-  const res = await t.app.inject({ method: 'POST', url: '/admin/scan', headers: adminHeaders(cookie), payload: { payload } });
+  const res = await t.app.inject({
+    method: 'POST',
+    url: '/admin/scan',
+    headers: adminHeaders(cookie),
+    payload: { payload },
+  });
   return { res, body: json<ScanResponse>(res), cookie };
 }
 
@@ -117,15 +141,25 @@ describe('readiness gate', () => {
 
   it('re-evaluates on the server and refuses failing reports', async () => {
     const failing = report({
-      components: report().components.map((c) => (c.id === 'android' ? { ...c, status: 'failed' as const } : c)),
+      components: report().components.map((c) =>
+        c.id === 'android' ? { ...c, status: 'failed' as const } : c,
+      ),
     });
-    const body = json<{ accepted: boolean; qrSecret?: string; reasons: string[] }>(await submit(failing));
+    const body = json<{ accepted: boolean; qrSecret?: string; reasons: string[] }>(
+      await submit(failing),
+    );
     expect(body.accepted).toBe(false);
     expect(body.qrSecret).toBeUndefined();
     expect(body.reasons.join()).toMatch(/Android SDK: failed/);
 
     const doctorFail = report();
-    doctorFail.doctor.categories[2] = { key: 'chrome', title: 'Chrome', status: 'missing', errors: ['Cannot find Chrome'], warnings: [] };
+    doctorFail.doctor.categories[2] = {
+      key: 'chrome',
+      title: 'Chrome',
+      status: 'missing',
+      errors: ['Cannot find Chrome'],
+      warnings: [],
+    };
     expect(json<{ accepted: boolean }>(await submit(doctorFail)).accepted).toBe(false);
 
     // Every submission is recorded for the admin detail view.
@@ -145,7 +179,8 @@ describe('scan', () => {
     const body = json<{ qrSecret: string }>(await submit(report()));
     return Buffer.from(body.qrSecret, 'base64');
   }
-  const qrAt = (secret: Buffer, window = currentWindow(t.clock.now)) => buildQrPayload(secret, attendeeId, window);
+  const qrAt = (secret: Buffer, window = currentWindow(t.clock.now)) =>
+    buildQrPayload(secret, attendeeId, window);
 
   it('refuses attendees who have not passed readiness', async () => {
     const fake = buildQrPayload(Buffer.alloc(32, 1), attendeeId, currentWindow(t.clock.now));
@@ -167,37 +202,58 @@ describe('scan', () => {
     const { cookie } = await loginAdmin(t, 'root@example.org');
     const burst = await Promise.all(
       Array.from({ length: 5 }, () =>
-        t.app.inject({ method: 'POST', url: '/admin/scan', headers: adminHeaders(cookie), payload: { payload: qrAt(secret) } }),
+        t.app.inject({
+          method: 'POST',
+          url: '/admin/scan',
+          headers: adminHeaders(cookie),
+          payload: { payload: qrAt(secret) },
+        }),
       ),
     );
     expect(burst.every((r) => json<ScanResponse>(r).result === 'already_checked_in')).toBe(true);
     expect(await t.prisma.attendance.count()).toBe(1);
 
-    const me = await t.app.inject({ method: 'GET', url: '/api/me', headers: { authorization: `Bearer ${token}` } });
-    expect(json<{ attendee: { checkedInAt: string } }>(me).attendee.checkedInAt).toBe(first.body.checkedInAt);
+    const me = await t.app.inject({
+      method: 'GET',
+      url: '/api/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(json<{ attendee: { checkedInAt: string } }>(me).attendee.checkedInAt).toBe(
+      first.body.checkedInAt,
+    );
   });
 
   it('accepts +/- 1 window, reports older codes as expired and forged ones as invalid', async () => {
     const secret = await ready();
     const w = currentWindow(t.clock.now);
     expect((await scanAs('door@example.org', qrAt(secret, w - 3))).body.result).toBe('expired');
-    expect((await scanAs('door@example.org', 'EK1.' + attendeeId + '.' + w + '.00000000')).body.result).toBe('invalid');
+    expect(
+      (await scanAs('door@example.org', 'EK1.' + attendeeId + '.' + w + '.00000000')).body.result,
+    ).toBe('invalid');
     expect((await scanAs('door@example.org', 'not a qr code')).body.result).toBe('invalid');
-    expect((await scanAs('door@example.org', qrAt(Buffer.alloc(32, 3)))).body.result).toBe('invalid');
+    expect((await scanAs('door@example.org', qrAt(Buffer.alloc(32, 3)))).body.result).toBe(
+      'invalid',
+    );
     expect((await scanAs('door@example.org', qrAt(secret, w + 1))).body.result).toBe('valid');
   });
 
   it('refuses scans after a readiness regression', async () => {
     const secret = await ready();
     const failing = report({
-      components: report().components.map((c) => (c.id === 'flutter' ? { ...c, status: 'failed' as const } : c)),
+      components: report().components.map((c) =>
+        c.id === 'flutter' ? { ...c, status: 'failed' as const } : c,
+      ),
     });
     await submit(failing);
     expect((await scanAs('door@example.org', qrAt(secret))).body.result).toBe('not_ready');
   });
 
   it('requires authentication and the right role', async () => {
-    const res = await t.app.inject({ method: 'POST', url: '/admin/scan', payload: { payload: 'x' } });
+    const res = await t.app.inject({
+      method: 'POST',
+      url: '/admin/scan',
+      payload: { payload: 'x' },
+    });
     expect(res.statusCode).toBe(401);
   });
 });
@@ -243,7 +299,10 @@ describe('manual check-in and export', () => {
 
   it('exports CSV and XLSX with name, email, time, method and scanner', async () => {
     const body = json<{ qrSecret: string }>(await submit(report()));
-    await scanAs('door@example.org', buildQrPayload(Buffer.from(body.qrSecret, 'base64'), attendeeId, currentWindow(t.clock.now)));
+    await scanAs(
+      'door@example.org',
+      buildQrPayload(Buffer.from(body.qrSecret, 'base64'), attendeeId, currentWindow(t.clock.now)),
+    );
     const other = await addAttendee(t, '=cmd@example.com', '=HYPERLINK("evil")');
     const { cookie } = await loginAdmin(t, 'root@example.org');
     await t.app.inject({
@@ -253,20 +312,42 @@ describe('manual check-in and export', () => {
       payload: { attendeeId: other.id, reason: 'no laptop' },
     });
 
-    const csv = await t.app.inject({ method: 'GET', url: '/admin/attendance/export?format=csv', headers: { cookie } });
+    const csv = await t.app.inject({
+      method: 'GET',
+      url: '/admin/attendance/export?format=csv',
+      headers: { cookie },
+    });
     expect(csv.headers['content-type']).toMatch(/text\/csv/);
-    expect(csv.headers['content-disposition']).toMatch(/attachment; filename="test-event-attendance-.*\.csv"/);
+    expect(csv.headers['content-disposition']).toMatch(
+      /attachment; filename="test-event-attendance-.*\.csv"/,
+    );
     const lines = csv.body.slice(1).trim().split('\r\n');
-    expect(lines[0]).toBe('Name,Email,Checked in at (UTC),Method,Scanner,Scanner email,Reason (manual),Attendee ID');
-    expect(lines[1]).toMatch(/^Asha Rao,asha@example.com,\d{4}-\d\d-\d\dT.*,qr,door,door@example.org,,/);
+    expect(lines[0]).toBe(
+      'Name,Email,Checked in at (UTC),Method,Scanner,Scanner email,Reason (manual),Attendee ID',
+    );
+    expect(lines[1]).toMatch(
+      /^Asha Rao,asha@example.com,\d{4}-\d\d-\d\dT.*,qr,door,door@example.org,,/,
+    );
     // Formula injection is neutralised.
     expect(lines[2]).toMatch(/^"'=HYPERLINK\(""evil""\)",'=cmd@example.com,.*,manual,root,/);
 
-    const xlsx = await t.app.inject({ method: 'GET', url: '/admin/attendance/export?format=xlsx', headers: { cookie } });
+    const xlsx = await t.app.inject({
+      method: 'GET',
+      url: '/admin/attendance/export?format=xlsx',
+      headers: { cookie },
+    });
     expect(xlsx.headers['content-type']).toMatch(/spreadsheetml/);
     expect(xlsx.rawPayload.subarray(0, 2).toString()).toBe('PK');
 
     const door = await loginAdmin(t, 'door@example.org');
-    expect((await t.app.inject({ method: 'GET', url: '/admin/attendance/export', headers: { cookie: door.cookie } })).statusCode).toBe(403);
+    expect(
+      (
+        await t.app.inject({
+          method: 'GET',
+          url: '/admin/attendance/export',
+          headers: { cookie: door.cookie },
+        })
+      ).statusCode,
+    ).toBe(403);
   });
 });

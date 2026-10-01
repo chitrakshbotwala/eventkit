@@ -4,7 +4,14 @@ import type { AdminStreamEvent } from '@eventkit/shared';
 type EventType = AdminStreamEvent['type'];
 type Handler = (e: AdminStreamEvent) => void;
 
-const TYPES: EventType[] = ['counters', 'progress', 'readiness', 'checkin', 'connectivity', 'schedule'];
+const TYPES: EventType[] = [
+  'counters',
+  'progress',
+  'readiness',
+  'checkin',
+  'connectivity',
+  'schedule',
+];
 
 /**
  * One shared EventSource for the whole app (the browser limits connections per

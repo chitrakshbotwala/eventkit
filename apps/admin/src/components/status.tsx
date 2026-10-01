@@ -15,12 +15,36 @@ export function AttendeeStatusBadge({ status }: { status: string }) {
 }
 
 export const COMPLIANCE: Record<ComplianceStatus, { label: string; tone: Tone; help: string }> = {
-  compliant: { label: 'Compliant', tone: 'green', help: 'Verified log covers the whole window and never reached the internet.' },
-  violation: { label: 'Violation', tone: 'red', help: 'The internet was reachable during the offline window.' },
-  warning: { label: 'Warning', tone: 'amber', help: 'Network interface up without internet (strict mode), or clock anomalies.' },
-  unverified: { label: 'Unverified', tone: 'gray', help: 'No verified log uploaded yet: cannot be assumed compliant.' },
-  monitoring_gap: { label: 'Monitoring gap', tone: 'violet', help: 'The app was not running (or silent) for part of the window.' },
-  tampered: { label: 'Tampered chain', tone: 'red', help: 'The uploaded log failed hash-chain / HMAC verification.' },
+  compliant: {
+    label: 'Compliant',
+    tone: 'green',
+    help: 'Verified log covers the whole window and never reached the internet.',
+  },
+  violation: {
+    label: 'Violation',
+    tone: 'red',
+    help: 'The internet was reachable during the offline window.',
+  },
+  warning: {
+    label: 'Warning',
+    tone: 'amber',
+    help: 'Network interface up without internet (strict mode), or clock anomalies.',
+  },
+  unverified: {
+    label: 'Unverified',
+    tone: 'gray',
+    help: 'No verified log uploaded yet: cannot be assumed compliant.',
+  },
+  monitoring_gap: {
+    label: 'Monitoring gap',
+    tone: 'violet',
+    help: 'The app was not running (or silent) for part of the window.',
+  },
+  tampered: {
+    label: 'Tampered chain',
+    tone: 'red',
+    help: 'The uploaded log failed hash-chain / HMAC verification.',
+  },
 };
 
 export function ComplianceBadge({ status }: { status: ComplianceStatus | null | undefined }) {
@@ -34,7 +58,10 @@ export function ComplianceBadge({ status }: { status: ComplianceStatus | null | 
   );
 }
 
-export const SCAN_RESULT: Record<ScanResultKind, { label: string; tone: 'green' | 'amber' | 'red' }> = {
+export const SCAN_RESULT: Record<
+  ScanResultKind,
+  { label: string; tone: 'green' | 'amber' | 'red' }
+> = {
   valid: { label: 'Checked in', tone: 'green' },
   already_checked_in: { label: 'Already checked in', tone: 'amber' },
   not_ready: { label: 'Setup not complete', tone: 'red' },

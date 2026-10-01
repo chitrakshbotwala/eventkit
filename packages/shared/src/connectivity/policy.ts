@@ -174,7 +174,8 @@ export function evaluateCompliance(input: ComplianceInput): ComplianceResult {
     mergedGaps = subtractIntervals({ from: w.startAt, to: evalEnd }, covered).filter(
       (g) => g.to - g.from >= MIN_GAP_MS,
     );
-    if (uploaded[0]!.time > w.startAt + MIN_GAP_MS) notes.push('monitor was not running at phase start');
+    if (uploaded[0]!.time > w.startAt + MIN_GAP_MS)
+      notes.push('monitor was not running at phase start');
   }
 
   const coversWindow = uploaded.some((e) => e.time >= w.endAt - threshold);

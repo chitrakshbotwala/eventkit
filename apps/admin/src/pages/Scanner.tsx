@@ -3,7 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { ScanResponse } from '@eventkit/shared';
 import { AttendeeStatusBadge, SCAN_RESULT } from '../components/status';
-import { Badge, Banner, Button, Card, Field, Input, Modal, PageHeader, Select, Spinner } from '../components/ui';
+import {
+  Badge,
+  Banner,
+  Button,
+  Card,
+  Field,
+  Input,
+  Modal,
+  PageHeader,
+  Select,
+  Spinner,
+} from '../components/ui';
 import { api, errorMessage, type SearchHit } from '../lib/api';
 import { fmtTime } from '../lib/format';
 import { useAuth } from '../lib/auth';
@@ -65,14 +76,28 @@ interface Feedback {
 
 function Overlay({ fb, onClose }: { fb: Feedback; onClose: () => void }) {
   const meta = SCAN_RESULT[fb.res.result];
-  const bg = meta.tone === 'green' ? 'bg-emerald-600' : meta.tone === 'amber' ? 'bg-amber-500' : 'bg-red-600';
+  const bg =
+    meta.tone === 'green'
+      ? 'bg-emerald-600'
+      : meta.tone === 'amber'
+        ? 'bg-amber-500'
+        : 'bg-red-600';
   const icon = meta.tone === 'green' ? '✓' : meta.tone === 'amber' ? '!' : '✕';
   return (
-    <div className={`fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center p-8 text-center text-white ${bg}`} onClick={onClose} role="alert" aria-live="assertive">
+    <div
+      className={`fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center p-8 text-center text-white ${bg}`}
+      onClick={onClose}
+      role="alert"
+      aria-live="assertive"
+    >
       <div className="animate-pop">
-        <div className="mx-auto grid h-36 w-36 place-items-center rounded-full bg-white/20 text-8xl font-bold">{icon}</div>
+        <div className="mx-auto grid h-36 w-36 place-items-center rounded-full bg-white/20 text-8xl font-bold">
+          {icon}
+        </div>
         <div className="mt-6 text-5xl font-bold tracking-tight sm:text-6xl">{meta.label}</div>
-        {fb.res.attendee && <div className="mt-4 text-3xl font-semibold sm:text-4xl">{fb.res.attendee.name}</div>}
+        {fb.res.attendee && (
+          <div className="mt-4 text-3xl font-semibold sm:text-4xl">{fb.res.attendee.name}</div>
+        )}
         {fb.res.attendee && <div className="mt-1 text-lg opacity-90">{fb.res.attendee.email}</div>}
         <div className="mt-4 text-lg opacity-90">{fb.res.message}</div>
         {fb.res.result === 'already_checked_in' && fb.res.checkedInAt && (
@@ -83,7 +108,10 @@ function Overlay({ fb, onClose }: { fb: Feedback; onClose: () => void }) {
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/30">
-        <div className="animate-shrink h-full bg-white" style={{ animationDuration: `${OVERLAY_MS}ms` }} />
+        <div
+          className="animate-shrink h-full bg-white"
+          style={{ animationDuration: `${OVERLAY_MS}ms` }}
+        />
       </div>
       <div className="absolute bottom-4 text-sm opacity-75">Tap to dismiss</div>
     </div>
@@ -117,19 +145,30 @@ function Camera({ onScan, paused }: { onScan: (text: string) => void; paused: bo
       stop();
       setError(null);
       if (!window.isSecureContext) {
-        setError('Camera access needs HTTPS (or localhost). Use a USB/Bluetooth scanner or open the admin over HTTPS.');
+        setError(
+          'Camera access needs HTTPS (or localhost). Use a USB/Bluetooth scanner or open the admin over HTTPS.',
+        );
         return;
       }
       try {
-        const reader = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 600 });
-        controls.current = await reader.decodeFromVideoDevice(id || undefined, videoRef.current!, (result) => {
-          if (result && !pausedRef.current) onScanRef.current(result.getText());
+        const reader = new BrowserQRCodeReader(undefined, {
+          delayBetweenScanAttempts: 150,
+          delayBetweenScanSuccess: 600,
         });
+        controls.current = await reader.decodeFromVideoDevice(
+          id || undefined,
+          videoRef.current!,
+          (result) => {
+            if (result && !pausedRef.current) onScanRef.current(result.getText());
+          },
+        );
         setRunning(true);
         const list = await BrowserQRCodeReader.listVideoInputDevices();
         setDevices(list);
       } catch (err) {
-        setError(err instanceof Error ? `Camera unavailable: ${err.message}` : 'Camera unavailable');
+        setError(
+          err instanceof Error ? `Camera unavailable: ${err.message}` : 'Camera unavailable',
+        );
         setRunning(false);
       }
     },
@@ -149,7 +188,9 @@ function Camera({ onScan, paused }: { onScan: (text: string) => void; paused: bo
             </Button>
           </div>
         )}
-        {running && <div className="pointer-events-none absolute inset-[18%] rounded-2xl border-4 border-white/70" />}
+        {running && (
+          <div className="pointer-events-none absolute inset-[18%] rounded-2xl border-4 border-white/70" />
+        )}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {devices.length > 1 && (
@@ -215,7 +256,8 @@ export function ScannerPage() {
       const payload = raw.trim();
       if (!payload) return;
       const now = Date.now();
-      if (last.current && last.current.payload === payload && now - last.current.at < DEBOUNCE_MS) return;
+      if (last.current && last.current.payload === payload && now - last.current.at < DEBOUNCE_MS)
+        return;
       last.current = { payload, at: now };
       setBusy(true);
       setError(null);
@@ -235,15 +277,21 @@ export function ScannerPage() {
   useEffect(() => {
     const t = setInterval(() => {
       const active = document.activeElement;
-      const typingElsewhere = active && active !== hidRef.current && ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName);
+      const typingElsewhere =
+        active &&
+        active !== hidRef.current &&
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName);
       if (!typingElsewhere && !manualFor) hidRef.current?.focus({ preventScroll: true });
     }, 500);
     return () => clearInterval(t);
   }, [manualFor]);
 
-  useEffect(() => () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    },
+    [],
+  );
 
   const onHid = (e: FormEvent) => {
     e.preventDefault();
@@ -254,7 +302,10 @@ export function ScannerPage() {
 
   return (
     <>
-      <PageHeader title="Check-in scanner" subtitle="Scan attendee QR codes with the camera or a USB/Bluetooth scanner." />
+      <PageHeader
+        title="Check-in scanner"
+        subtitle="Scan attendee QR codes with the camera or a USB/Bluetooth scanner."
+      />
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
         <div className="space-y-6">
           <Card title="Camera">
@@ -284,7 +335,12 @@ export function ScannerPage() {
           </Card>
         </div>
         <div className="space-y-6">
-          <ManualSearch search={search} setSearch={setSearch} canManual={isSuperadmin} onManual={setManualFor} />
+          <ManualSearch
+            search={search}
+            setSearch={setSearch}
+            canManual={isSuperadmin}
+            onManual={setManualFor}
+          />
           <Card title="Recent scans">
             {recent.length === 0 ? (
               <p className="text-sm text-slate-500">Nothing scanned yet.</p>
@@ -295,8 +351,12 @@ export function ScannerPage() {
                   return (
                     <li key={r.at} className="flex items-center gap-3 py-2 text-sm">
                       <Badge tone={meta.tone}>{meta.label}</Badge>
-                      <span className="min-w-0 flex-1 truncate">{r.res.attendee?.name ?? r.res.message}</span>
-                      <span className="text-xs tabular-nums text-slate-400">{new Date(r.at).toLocaleTimeString()}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {r.res.attendee?.name ?? r.res.message}
+                      </span>
+                      <span className="text-xs tabular-nums text-slate-400">
+                        {new Date(r.at).toLocaleTimeString()}
+                      </span>
                     </li>
                   );
                 })}
@@ -334,10 +394,20 @@ function ManualSearch({
     const t = setTimeout(() => setQ(search.trim()), 250);
     return () => clearTimeout(t);
   }, [search]);
-  const results = useQuery({ queryKey: ['search', q], queryFn: () => api.searchAttendees(q), enabled: q.length >= 2 });
+  const results = useQuery({
+    queryKey: ['search', q],
+    queryFn: () => api.searchAttendees(q),
+    enabled: q.length >= 2,
+  });
   return (
     <Card title="Manual lookup">
-      <Input type="search" aria-label="Search attendee" placeholder="Search by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <Input
+        type="search"
+        aria-label="Search attendee"
+        placeholder="Search by name or email…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
       <div className="mt-3">
         {q.length < 2 ? (
           <p className="text-xs text-slate-500">Type at least 2 characters.</p>
@@ -355,7 +425,11 @@ function ManualSearch({
                   <div className="truncate font-medium">{h.name}</div>
                   <div className="truncate text-xs text-slate-500">{h.email}</div>
                 </div>
-                {h.checkedInAt ? <Badge tone="green">in at {fmtTime(h.checkedInAt)}</Badge> : <AttendeeStatusBadge status={h.status} />}
+                {h.checkedInAt ? (
+                  <Badge tone="green">in at {fmtTime(h.checkedInAt)}</Badge>
+                ) : (
+                  <AttendeeStatusBadge status={h.status} />
+                )}
                 {canManual && !h.checkedInAt && (
                   <Button size="sm" onClick={() => onManual(h)}>
                     Check in
@@ -366,12 +440,22 @@ function ManualSearch({
           </ul>
         )}
       </div>
-      {!canManual && <p className="mt-3 text-xs text-slate-500">Manual check-in is restricted to organizers.</p>}
+      {!canManual && (
+        <p className="mt-3 text-xs text-slate-500">Manual check-in is restricted to organizers.</p>
+      )}
     </Card>
   );
 }
 
-function ManualCheckinDialog({ hit, onClose, onDone }: { hit: SearchHit | null; onClose: () => void; onDone: (r: ScanResponse) => void }) {
+function ManualCheckinDialog({
+  hit,
+  onClose,
+  onDone,
+}: {
+  hit: SearchHit | null;
+  onClose: () => void;
+  onDone: (r: ScanResponse) => void;
+}) {
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -394,9 +478,20 @@ function ManualCheckinDialog({ hit, onClose, onDone }: { hit: SearchHit | null; 
   return (
     <Modal open={Boolean(hit)} onClose={onClose} title={`Manual check-in: ${hit?.name ?? ''}`}>
       <form onSubmit={submit} className="space-y-4">
-        <Banner tone="warn">Manual check-in bypasses the laptop readiness check. It is recorded in the audit log with your name.</Banner>
+        <Banner tone="warn">
+          Manual check-in bypasses the laptop readiness check. It is recorded in the audit log with
+          your name.
+        </Banner>
         <Field label="Reason (required)" hint="e.g. laptop battery died, QR app crashed">
-          {(id) => <Input id={id} required minLength={3} value={reason} onChange={(e) => setReason(e.target.value)} />}
+          {(id) => (
+            <Input
+              id={id}
+              required
+              minLength={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          )}
         </Field>
         {error && <Banner tone="error">{error}</Banner>}
         <div className="flex justify-end gap-2">

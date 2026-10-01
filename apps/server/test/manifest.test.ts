@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { findComponent, type SignedManifest } from '@eventkit/shared';
 import { verifySignedManifest } from '@eventkit/shared/node';
 import { placeholderResolvedSet } from '../src/services/manifest/placeholder';
@@ -127,5 +129,23 @@ describe('GET /api/manifest', () => {
     const env = json<SignedManifest>(await getManifest());
     (env.payload as { mirrorBaseUrl: string }).mirrorBaseUrl = 'http://evil.local';
     expect(() => verifySignedManifest(env, [keys.publicKey])).toThrow(/signature invalid/);
+  });
+
+  it('serves desktop updates from DATA_DIR/updates without caching the feed', async () => {
+    t = await makeApp();
+    const dir = join(t.app.ctx.env.DATA_DIR, 'updates');
+    writeFileSync(join(dir, 'latest.yml'), 'version: 0.2.0\n');
+    const feed = await t.app.inject({ method: 'GET', url: '/updates/latest.yml' });
+    expect(feed.statusCode).toBe(200);
+    expect(feed.body).toContain('0.2.0');
+    expect(feed.headers['cache-control']).toBe('no-cache');
+    const missing = await t.app.inject({
+      method: 'GET',
+      url: '/updates/nope.exe',
+      headers: { accept: 'text/html' },
+    });
+    expect(missing.statusCode).toBe(404);
+    const escape = await t.app.inject({ method: 'GET', url: '/updates/..%2f..%2fetc%2fpasswd' });
+    expect([403, 404]).toContain(escape.statusCode);
   });
 });

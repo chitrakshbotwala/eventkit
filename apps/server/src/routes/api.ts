@@ -58,7 +58,14 @@ export async function apiRoutes(app: FastifyInstance) {
   app.post(
     '/api/readiness',
     { preHandler: requireAttendee, config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
-    async (req) => submitReadiness(ctx, req.attendee!, req.device!, parse(ReadinessBodySchema, req.body), req.ip),
+    async (req) =>
+      submitReadiness(
+        ctx,
+        req.attendee!,
+        req.device!,
+        parse(ReadinessBodySchema, req.body),
+        req.ip,
+      ),
   );
 
   // Starter project zip (content-addressed; integrity is checked by the client against the manifest).
