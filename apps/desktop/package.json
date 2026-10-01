@@ -1,0 +1,43 @@
+{
+  "name": "@eventkit/desktop",
+  "productName": "EventKit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-click Flutter toolchain setup, attendance QR and offline-phase monitor",
+  "author": "Event organizers",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "dev:simulate": "electron-vite dev -- --simulate",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
+    "test": "vitest run",
+    "dist": "electron-vite build && electron-builder --config electron-builder.yml --publish never",
+    "dist:win": "electron-vite build && electron-builder --config electron-builder.yml --win --publish never",
+    "dist:mac": "electron-vite build && electron-builder --config electron-builder.yml --mac --publish never",
+    "dist:linux": "electron-vite build && electron-builder --config electron-builder.yml --linux --publish never"
+  },
+  "devDependencies": {
+    "@eventkit/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.10.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.12",
+    "electron-updater": "^6.6.2",
+    "electron-vite": "^5.0.0",
+    "extract-zip": "^2.0.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7",
+    "zod": "^4.1.12"
+  }
+}

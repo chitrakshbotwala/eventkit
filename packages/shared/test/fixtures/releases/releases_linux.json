@@ -1,0 +1,16 @@
+{
+  "base_url": "https://storage.googleapis.com/flutter_infra_release/releases",
+  "current_release": { "stable": "a0000000000000000000000000000000000000a2" },
+  "releases": [
+    {
+      "hash": "a0000000000000000000000000000000000000a2",
+      "channel": "stable",
+      "version": "3.35.4",
+      "dart_sdk_version": "3.9.2",
+      "dart_sdk_arch": "x64",
+      "release_date": "2025-09-16T19:00:00.000Z",
+      "archive": "stable/linux/flutter_linux_3.35.4-stable.tar.xz",
+      "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    }
+  ]
+}

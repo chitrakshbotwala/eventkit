@@ -1,0 +1,116 @@
+name: Release desktop app
+
+# Push a tag like v0.2.0 (matching apps/desktop/package.json "version") to build signed
+# installers for all three platforms and attach them to a draft GitHub release.
+#
+# Repository variables (Settings → Secrets and variables → Actions → Variables):
+#   EVENTKIT_SERVER_URL        https://event.example.org   (baked into the app; must be https)
+#   EVENTKIT_MANIFEST_PUBKEYS  base64 Ed25519 public key(s), comma-separated (pnpm keys:gen)
+# Optional secrets (installers are unsigned without them; see README "Code signing"):
+#   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD                      Windows Authenticode (.pfx, base64)
+#   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD                      Developer ID Application (.p12, base64)
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID    macOS notarization
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    env:
+      MAIN_VITE_API_BASE_URL: ${{ vars.EVENTKIT_SERVER_URL }}
+      MAIN_VITE_MANIFEST_PUBKEYS: ${{ vars.EVENTKIT_MANIFEST_PUBKEYS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check build configuration
+        shell: bash
+        run: |
+          case "$MAIN_VITE_API_BASE_URL" in
+            https://*) ;;
+            *) echo "::error::Set the EVENTKIT_SERVER_URL repository variable to an https:// URL"; exit 1 ;;
+          esac
+          if [ -z "$MAIN_VITE_MANIFEST_PUBKEYS" ]; then
+            echo "::error::Set the EVENTKIT_MANIFEST_PUBKEYS repository variable (pnpm keys:gen)"; exit 1
+          fi
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version=$(node -p "require('./apps/desktop/package.json').version")
+            if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+              echo "::error::Tag ${GITHUB_REF_NAME} does not match apps/desktop version $version"; exit 1
+            fi
+          fi
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @eventkit/desktop test
+
+      - name: Build installers
+        shell: bash
+        env:
+          # electron-builder skips signing when these are empty.
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ matrix.target == 'mac' && secrets.MAC_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.target == 'mac' && secrets.MAC_CSC_KEY_PASSWORD || '' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ matrix.target == 'mac' && secrets.MAC_CSC_LINK != '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm --filter @eventkit/desktop dist:${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventkit-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest*.yml
+
+  release:
+    name: Draft GitHub release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist/*
+          body: |
+            Desktop installers for attendees.
+
+            To enable auto-update, copy every file from this release (including the
+            `latest*.yml` files) into `<DATA_DIR>/updates/` on the event server.

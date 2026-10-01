@@ -1,0 +1,109 @@
+# Installers for attendees. Build with `pnpm --filter @eventkit/desktop dist:<win|mac|linux>`.
+# Signing and notarization use environment variables (see README, "Code signing").
+appId: org.eventkit.desktop
+productName: EventKit
+copyright: Copyright © 2026 Event organizers
+
+directories:
+  output: release
+  buildResources: build
+
+# electron-vite bundles every dependency into out/, so no node_modules are shipped.
+files:
+  - out/**
+  - resources/**
+  - package.json
+  - '!**/*.map'
+asarUnpack:
+  - resources/**
+npmRebuild: false
+nodeGypRebuild: false
+electronLanguages: [en-US]
+
+# Lock down the shipped binary: no ELECTRON_RUN_AS_NODE, NODE_OPTIONS or --inspect,
+# and only the integrity-checked app.asar is loaded.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+
+win:
+  # x64 only: Windows on Arm runs it (and the x64 toolchain it installs) under emulation,
+  # and a dual-arch NSIS installer would double the download.
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.png
+  artifactName: ${productName}-Setup-${version}-${arch}.${ext}
+  # Authenticode: set CSC_LINK + CSC_KEY_PASSWORD (or WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD).
+  # Without a certificate the installer works but SmartScreen warns.
+
+nsis:
+  # One click, per-user, no UAC prompt. The app itself never needs admin rights.
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  runAfterFinish: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: EventKit
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    # The zip is what electron-updater downloads on macOS.
+    - target: zip
+      arch: [arm64, x64]
+  icon: build/icon.png
+  category: public.app-category.developer-tools
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Signing: CSC_LINK + CSC_KEY_PASSWORD (Developer ID Application certificate).
+  # Notarization runs when APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID
+  # (or APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER) are set.
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  writeUpdateInfo: false
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: build/icon.png
+  category: Development
+  synopsis: Flutter workshop setup, attendance QR and offline-phase monitor
+  maintainer: Event organizers <organizers@example.org>
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+deb:
+  # pkexec (policykit-1) is used once during setup to install system packages.
+  depends:
+    [
+      libgtk-3-0,
+      libnotify4,
+      libnss3,
+      libxss1,
+      libxtst6,
+      xdg-utils,
+      libatspi2.0-0,
+      libuuid1,
+      libsecret-1-0,
+    ]
+  recommends: ['pkexec | policykit-1']
+
+# Required so electron-builder writes app-update.yml and latest*.yml. The app overrides
+# the URL at runtime with <server>/updates/ (see src/main/updater.ts), so this
+# placeholder is never contacted.
+publish:
+  provider: generic
+  url: https://updates.invalid/eventkit/

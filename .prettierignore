@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+dist
+out
+release
+coverage
+**/fixtures/**
+apps/server/data
