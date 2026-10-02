@@ -74,8 +74,8 @@ Decisions taken without asking. Each one is small and can be reversed.
 
 ## Packaging and updates
 
-- **Installers.** Windows gets one NSIS one-click installer: per-user, no UAC, **x64 only**. Windows on Arm runs it, and the x64 toolchain it installs, under emulation, and a dual-arch installer would double the download. macOS gets a dmg plus a zip for each of arm64 and x64. Linux gets an AppImage and a deb.
-- **Updates come from the event server**, not GitHub. The app points electron-updater at `<server>/updates/` at runtime, so the update feed is the same HTTPS origin the app already trusts. No public release hosting is needed, and organizers decide when an update goes live by copying files. The deb package does not self-update. Updates are never checked during phase 2.
+- **Installers.** Windows gets one NSIS one-click installer: per-user, no UAC, **x64 only**. Windows on Arm runs it, and the x64 toolchain it installs, under emulation, and a dual-arch installer would double the download. macOS gets a dmg plus a zip for each of arm64 and x64. Linux gets an AppImage, a deb, an rpm and an Arch pacman package, all x64. One Linux build serves Wayland and X11: Electron picks the display server at startup, and release CI launches it under both.
+- **Downloads and updates come from GitHub Releases.** The repository is public, so its releases are the download page, and the release workflow bakes the repository into the app as its update feed. Publishing a release is therefore the moment an update goes live; pre-releases (`-rc` versions) let organizers test a build without updating anyone. Builds made without the workflow fall back to `<server>/updates/`. The deb, rpm and pacman packages do not self-update, and unsigned Mac builds can't. Updates are never checked during phase 2.
 - **Electron fuses** are flipped at package time: no `RunAsNode`, no `NODE_OPTIONS`, no `--inspect`, and asar integrity validation is on. Chromium's `--remote-debugging-port` cannot be disabled this way, which is one more reason client attestation is evidence rather than proof (see README).
 
 ## Repository branches
