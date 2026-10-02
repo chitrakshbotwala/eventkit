@@ -4,6 +4,7 @@ import type { ComponentOf } from '@eventkit/shared';
 import { extractArchive, replaceDir, singleChild } from '../extract';
 import { flutterBin } from '../paths';
 import { SetupError, type ComponentContext, type ComponentRunner } from '../types';
+import { adopt, findExistingFlutter, release } from './existing';
 import { COMPONENT_WEIGHTS } from './meta';
 import { flutter, flutterVersion, hasFlutter, sh, tryRun } from './util';
 
@@ -36,14 +37,19 @@ export const flutterRunner: ComponentRunner<ComponentOf<'flutter'>> = {
   weight: COMPONENT_WEIGHTS.flutter,
   dependsOn: () => ['git'],
   artifacts: (c) => [c.artifact],
-  async detect(_c, ctx) {
-    if (!hasFlutter(ctx)) return { installed: false };
+  async detect(c, ctx) {
+    if (!hasFlutter(ctx)) {
+      const existing = await findExistingFlutter(c, ctx);
+      if (!existing) return { installed: false };
+      adopt(ctx, 'flutter', existing);
+    }
     const v = await flutterVersion(ctx);
     return v
       ? { installed: true, version: v.frameworkVersion, path: ctx.dirs.flutter }
       : { installed: false, detail: 'flutter present but not runnable' };
   },
   async install(c, ctx) {
+    release(ctx, 'flutter');
     ctx.step('download', `Downloading Flutter ${c.version}`);
     const archive = await ctx.download(c.artifact);
     ctx.step('verify-hash', 'SHA-256 verified');

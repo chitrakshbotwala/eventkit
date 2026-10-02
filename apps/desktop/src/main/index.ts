@@ -248,11 +248,15 @@ function registerIpc() {
       return engine.facts.doctorOutput ?? 'flutter doctor (simulated): no output yet';
     const root = engine.installRoot;
     if (!root) throw new Error('Flutter is not installed yet');
-    const res = await run(flutterBin(installDirs(root), platform), ['doctor', '-v'], {
-      env: engine.overlay.childEnv(),
-      allowFailure: true,
-      timeoutMs: 5 * 60_000,
-    });
+    const res = await run(
+      flutterBin(installDirs(root, engine.facts.adopted), platform),
+      ['doctor', '-v'],
+      {
+        env: engine.overlay.childEnv(),
+        allowFailure: true,
+        timeoutMs: 5 * 60_000,
+      },
+    );
     return `${res.stdout}\n${res.stderr}`.trim();
   });
 

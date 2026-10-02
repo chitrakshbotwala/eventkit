@@ -5,6 +5,7 @@ import type { ComponentOf } from '@eventkit/shared';
 import { extractArchive, replaceDir } from '../extract';
 import { exe, javaHome, sdkmanager } from '../paths';
 import { SetupError, type ComponentContext, type ComponentRunner } from '../types';
+import { adopt, findExistingAndroidSdk } from './existing';
 import { COMPONENT_WEIGHTS } from './meta';
 import { flutter, hasFlutter, sh, tryRun, yesResponder } from './util';
 
@@ -82,6 +83,11 @@ export const androidRunner: ComponentRunner<ComponentOf<'android'>> = {
   dependsOn: () => ['java', 'flutter'],
   artifacts: (c, ctx) => (existsSync(sdkmanager(ctx.dirs, ctx.platform)) ? [] : [c.cmdlineTools]),
   async detect(c, ctx) {
+    // An existing SDK is kept even when packages are missing: install adds only those.
+    if (!existsSync(ctx.dirs.androidSdk)) {
+      const existing = findExistingAndroidSdk(ctx);
+      if (existing) adopt(ctx, 'androidSdk', existing);
+    }
     const installed = await installedPackages(ctx);
     if (!installed) return { installed: false };
     const missing = c.packages.filter((p) => !installed.has(p));
