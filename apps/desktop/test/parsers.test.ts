@@ -19,6 +19,38 @@ describe('sdkmanager --list_installed parsing', () => {
       'platforms;android-36',
     ]);
   });
+
+  it('reads the format of cmdline-tools 23+, which hands off to the android CLI', () => {
+    const out = `WARNING: The SDK Manager CLI tool (sdkmanager) is deprecated. Android CLI will be used instead.
+The 'android' binary can also be found in the cmdline-tools directory, and 'android sdk' is the replacement for 'sdkmanager'.
+To learn more about the Android CLI and how to use it, see the documentation (https://d.android.com/tools/agents/android-cli)
+Installed packages:
+  build-tools/36.0.0                                              36.0.0                             Android SDK Build-Tools 36
+  cmdline-tools/latest                                            unknown         ->        23.0.0   Android SDK Command-line Tools (latest)
+  emulator                                                        36.3.10         ->        37.2.12  Android Emulator
+  platform-tools                                                  37.0.1                             Android SDK Platform-Tools
+  platforms/android-36                                            2.0.0                              Android SDK Platform 36
+  system-images/android-36.1/google_apis_playstore/x86_64         4.0.0                              Google Play Intel x86_64 Atom System Image
+`;
+    expect([...parseInstalled(out)].sort()).toEqual([
+      'build-tools;36.0.0',
+      'cmdline-tools;latest',
+      'emulator',
+      'platform-tools',
+      'platforms;android-36',
+      'system-images;android-36.1;google_apis_playstore;x86_64',
+    ]);
+  });
+
+  it('ignores packages listed under other sections', () => {
+    const out = `Installed packages:
+  platform-tools       | 36.0.0  | Android SDK Platform-Tools     | platform-tools
+
+Available Updates:
+  platforms;android-37 | 1       | Android SDK Platform 37
+`;
+    expect([...parseInstalled(out)]).toEqual(['platform-tools']);
+  });
 });
 
 describe('flutter --version --machine', () => {

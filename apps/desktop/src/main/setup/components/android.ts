@@ -30,11 +30,25 @@ function sdkArgs(ctx: ComponentContext) {
 }
 
 /** Parse `sdkmanager --list_installed` into package paths. */
+/**
+ * Package ids from `sdkmanager --list_installed`, in the `;` form the manifest uses.
+ * Two output formats exist:
+ * - classic table:  `  build-tools;36.0.0 | 36.0.0 | Android SDK Build-Tools 36 | build-tools\36.0.0`
+ * - cmdline-tools 23+, where sdkmanager hands off to the `android` CLI:
+ *   `  build-tools/36.0.0      36.0.0      Android SDK Build-Tools 36`
+ */
 export function parseInstalled(out: string): Set<string> {
   const set = new Set<string>();
+  let installedSection = true;
   for (const line of out.split(/\r?\n/)) {
-    const m = /^\s{0,4}([a-z][\w.;-]*)\s+\|\s+[\w.-]+/i.exec(line);
-    if (m && m[1] !== 'Path') set.add(m[1]!);
+    // Section headers ("Installed packages:", "Available Updates:") are unindented.
+    if (/^\S.*:\s*$/.test(line)) {
+      installedSection = /^installed packages:/i.test(line);
+      continue;
+    }
+    if (!installedSection) continue;
+    const m = /^\s{1,4}([a-z][\w.;/-]*)\s+(?:\|\s+)?[\w.-]+/i.exec(line);
+    if (m && m[1] !== 'Path') set.add(m[1]!.replace(/\//g, ';'));
   }
   return set;
 }
