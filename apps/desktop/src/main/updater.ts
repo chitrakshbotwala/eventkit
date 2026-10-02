@@ -6,6 +6,9 @@ import { errMsg, logger } from './logger';
 const log = logger.scope('updater');
 const CHECK_EVERY_MS = 4 * 3600_000;
 
+/** No latest*.yml on the server yet: normal until organizers publish a release. */
+const feedEmpty = (m: string) => /Cannot find channel ".*" update info: HttpError: 404/.test(m);
+
 /**
  * Auto-update from the event server (`<server>/updates/`), which organizers fill
  * with the release artifacts (latest*.yml + installers). electron-updater checks the
@@ -22,7 +25,9 @@ export function startAutoUpdate(opts: { canCheck: () => boolean }) {
   autoUpdater.logger = {
     info: (m: unknown) => log.info(String(m)),
     warn: (m: unknown) => log.warn(String(m)),
-    error: (m: unknown) => log.error(String(m)),
+    error: (m: unknown) => {
+      if (!feedEmpty(String(m))) log.error(String(m));
+    },
     debug: (m: unknown) => log.debug(String(m)),
   };
   autoUpdater.setFeedURL({ provider: 'generic', url: `${config.apiBaseUrl}/updates/` });
@@ -44,7 +49,9 @@ export function startAutoUpdate(opts: { canCheck: () => boolean }) {
   const check = () => {
     if (!opts.canCheck()) return;
     autoUpdater.checkForUpdates().catch((err: unknown) => {
-      log.warn(`update check failed: ${errMsg(err)}`);
+      const msg = errMsg(err);
+      if (feedEmpty(msg)) log.info('no release published on the server yet');
+      else log.warn(`update check failed: ${msg}`);
     });
   };
   setTimeout(check, 30_000);
