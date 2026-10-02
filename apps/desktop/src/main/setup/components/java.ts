@@ -4,6 +4,7 @@ import { majorOf, type ComponentOf } from '@eventkit/shared';
 import { extractArchive, replaceDir, singleChild } from '../extract';
 import { exe, javaHome } from '../paths';
 import { SetupError, type ComponentContext, type ComponentRunner } from '../types';
+import { adopt, findExistingJdk, MAX_JAVA_MAJOR, release } from './existing';
 import { COMPONENT_WEIGHTS } from './meta';
 import { flutter, hasFlutter, tryRun } from './util';
 
@@ -30,11 +31,16 @@ export const javaRunner: ComponentRunner<ComponentOf<'java'>> = {
   weight: COMPONENT_WEIGHTS.java,
   dependsOn: () => ['system'],
   artifacts: (c) => [c.artifact],
-  async detect(_c, ctx) {
+  async detect(c, ctx) {
+    if (!existsSync(javaExe(ctx))) {
+      const existing = await findExistingJdk(c, ctx);
+      if (existing) adopt(ctx, 'jdk', existing);
+    }
     const v = await javaVersion(ctx);
     return v ? { installed: true, version: v } : { installed: false };
   },
   async install(c, ctx) {
+    release(ctx, 'jdk');
     ctx.step('download', 'Downloading Temurin JDK 17');
     const archive = await ctx.download(c.artifact);
     ctx.step('install', 'Extracting JDK');
@@ -57,6 +63,8 @@ export const javaRunner: ComponentRunner<ComponentOf<'java'>> = {
     const major = majorOf(v) ?? 0;
     if (major < c.majorVersion)
       return { ok: false, version: v, detail: `Java ${v} < ${c.majorVersion}` };
+    if (major > MAX_JAVA_MAJOR)
+      return { ok: false, version: v, detail: `Java ${v} is newer than Gradle supports` };
     return { ok: true, version: v };
   },
 };

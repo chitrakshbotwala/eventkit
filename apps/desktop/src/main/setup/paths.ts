@@ -2,7 +2,7 @@ import { accessSync, constants, mkdirSync, rmSync, writeFileSync } from 'node:fs
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { Platform } from '@eventkit/shared';
-import type { InstallDirs } from './types';
+import type { AdoptedDirs, InstallDirs } from './types';
 
 /**
  * Flutter, Gradle and the Android tools break on paths with spaces or
@@ -67,12 +67,13 @@ export function chooseInstallRoot(platform: Platform, previous?: string | null):
   return { root: null, tried };
 }
 
-export function installDirs(root: string): InstallDirs {
+/** Managed locations under `root`, with any adopted existing installs in their place. */
+export function installDirs(root: string, adopted: AdoptedDirs = {}): InstallDirs {
   return {
     root,
-    flutter: join(root, 'flutter'),
-    jdk: join(root, 'jdk-17'),
-    androidSdk: join(root, 'android-sdk'),
+    flutter: adopted.flutter ?? join(root, 'flutter'),
+    jdk: adopted.jdk ?? join(root, 'jdk-17'),
+    androidSdk: adopted.androidSdk ?? join(root, 'android-sdk'),
     vscode: join(root, 'vscode'),
     downloads: join(root, '.downloads'),
     staging: join(root, '.staging'),

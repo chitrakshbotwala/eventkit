@@ -470,7 +470,7 @@ export class SetupEngine extends EventEmitter {
       this.save();
       log.info(`install root: ${choice.root}`);
     }
-    const dirs = installDirs(this.state.installRoot);
+    const dirs = installDirs(this.state.installRoot, this.state.facts.adopted);
     const signal = this.abort?.signal ?? new AbortController().signal;
     const ctx: ComponentContext = {
       manifest,

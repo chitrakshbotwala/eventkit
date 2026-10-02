@@ -43,6 +43,8 @@ export interface Facts {
   doctorEval?: DoctorEvaluation;
   flutterVersion?: string;
   devtoolsVersion?: string;
+  /** Toolchains the attendee already had, used instead of the managed copies. */
+  adopted?: AdoptedDirs;
   /** Simulate mode: components "installed" so far, with versions. */
   simulated?: Partial<Record<ComponentId, string>>;
 }
@@ -57,6 +59,8 @@ export interface InstallDirs {
   staging: string;
   projects: string;
 }
+
+export type AdoptedDirs = Partial<Pick<InstallDirs, 'flutter' | 'jdk' | 'androidSdk'>>;
 
 export interface ToolRunner {
   /** Run an executable (or .bat/.cmd on Windows) with an argument array. */
