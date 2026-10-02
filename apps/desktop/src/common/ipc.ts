@@ -56,6 +56,8 @@ export interface SetupSnapshot {
   installRoot: string | null;
   manifestId: string | null;
   placeholderManifest: boolean;
+  /** The organizers have not published the setup manifest yet; the app keeps checking. */
+  waitingForManifest: boolean;
   /** Shown before an OS permission prompt is triggered. */
   elevationNotice: string | null;
   /** Shown near the start button (e.g. Android license consent). */

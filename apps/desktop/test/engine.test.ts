@@ -111,7 +111,11 @@ const downloader: DownloaderLike = {
 };
 
 function makeEngine() {
-  return new SetupEngine({
+  return new SetupEngine(makeEngineDeps());
+}
+
+function makeEngineDeps(): ConstructorParameters<typeof SetupEngine>[0] {
+  return {
     platform: 'linux',
     arch: 'x64',
     statePath: join(dir, 'state.json'),
@@ -126,7 +130,7 @@ function makeEngine() {
     onComplete: async () => {
       completed++;
     },
-  });
+  };
 }
 
 beforeEach(() => {
@@ -217,6 +221,44 @@ describe('SetupEngine', () => {
     await e.start();
     expect(e.snapshot().error).toMatch(/not published/);
     expect(installs).toEqual([]);
+  });
+
+  it('waits quietly while the organizers have not published the manifest', async () => {
+    let published = false;
+    const e = new SetupEngine({
+      ...makeEngineDeps(),
+      manifestSource: {
+        load: async () => {
+          if (published) return { manifest: m, fromCache: false };
+          throw Object.assign(
+            new Error('The organizers have not published the setup manifest yet.'),
+            {
+              code: 'manifest_not_ready',
+            },
+          );
+        },
+      },
+    });
+    const announced: unknown[] = [];
+    e.on('published', () => announced.push(true));
+
+    await e.prepare();
+    let s = e.snapshot();
+    expect(s.waitingForManifest).toBe(true);
+    expect(s.error).toBeNull();
+
+    await e.start();
+    s = e.snapshot();
+    expect(s.waitingForManifest).toBe(true);
+    expect(s.error).toBeNull();
+    expect(installs).toEqual([]);
+
+    published = true;
+    await e.prepare();
+    s = e.snapshot();
+    expect(s.waitingForManifest).toBe(false);
+    expect(s.components.length).toBeGreaterThan(0);
+    expect(announced).toHaveLength(1);
   });
 
   it('reverify detects a component that disappeared', async () => {

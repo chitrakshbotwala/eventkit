@@ -190,27 +190,40 @@ export function Setup({ snap, onDone }: { snap: SetupSnapshot | null; onDone: ()
           {snap.elevationNotice}
         </Banner>
       )}
+      {snap.waitingForManifest && !snap.running && (
+        <Banner tone="info" title="Setup isn't open yet">
+          The organizers haven't published the install list yet. EventKit checks again every few
+          minutes and notifies you when you can start. You can close this window; EventKit keeps
+          running in the tray.
+        </Banner>
+      )}
       {snap.error && !snap.running && (
         <Banner tone="error" title="Setup needs attention">
           <span className="selectable">{snap.error}</span>
         </Banner>
       )}
 
-      <Card className="p-0">
-        <ul className="divide-y divide-slate-100 px-5 dark:divide-slate-800">
-          {snap.components.map((c) => (
-            <ComponentRow
-              key={c.id}
-              c={c}
-              busy={snap.running}
-              onRetry={() => void ek.setup.retry(c.id)}
-            />
-          ))}
-          {snap.components.length === 0 && (
-            <li className="py-6 text-center text-sm text-slate-500">Loading setup plan…</li>
-          )}
-        </ul>
-      </Card>
+      {!(snap.waitingForManifest && snap.components.length === 0) && (
+        <Card className="p-0">
+          <ul className="divide-y divide-slate-100 px-5 dark:divide-slate-800">
+            {snap.components.map((c) => (
+              <ComponentRow
+                key={c.id}
+                c={c}
+                busy={snap.running}
+                onRetry={() => void ek.setup.retry(c.id)}
+              />
+            ))}
+            {snap.components.length === 0 && (
+              <li className="py-6 text-center text-sm text-slate-500">
+                {snap.error && !snap.running
+                  ? 'The setup plan could not be loaded.'
+                  : 'Loading setup plan…'}
+              </li>
+            )}
+          </ul>
+        </Card>
+      )}
 
       {snap.doctorWarnings.length > 0 && (
         <Card>
