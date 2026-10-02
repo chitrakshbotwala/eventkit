@@ -131,6 +131,13 @@ engine.on('snapshot', (s) => {
   reporter.push(s);
 });
 engine.on('status', () => reporter.push(engine.snapshot(), true));
+engine.on('published', () => {
+  if (engine.isComplete || !Notification.isSupported()) return;
+  new Notification({
+    title: 'Setup is open',
+    body: 'The organizers published the install list. Open EventKit and click "Set up my laptop".',
+  }).show();
+});
 auth.on('changed', (s) => {
   send('auth:changed', s);
   void pushQr();

@@ -27,6 +27,15 @@ import {
 
 const log = logger.scope('setup');
 
+/** How often to ask again while the organizers have not published the manifest. */
+const PUBLISH_RECHECK_MS = 5 * 60_000;
+
+/** The server answered 503 manifest_not_ready: nothing is wrong on this laptop. */
+const notPublished = (err: unknown) =>
+  typeof err === 'object' &&
+  err !== null &&
+  (err as { code?: unknown }).code === 'manifest_not_ready';
+
 export interface ManifestSource {
   load(opts: { allowCached: boolean }): Promise<{ manifest: ManifestPayload; fromCache: boolean }>;
 }
@@ -82,6 +91,8 @@ export class SetupEngine extends EventEmitter {
   private current: ComponentId | null = null;
   private abort: AbortController | null = null;
   private error: string | null = null;
+  private waitingForManifest = false;
+  private recheckTimer: NodeJS.Timeout | null = null;
   private elevationNotice: string | null = null;
   private prefetch = new Map<string, Promise<string>>();
   private readiness: ReadinessView = { state: 'unknown', reasons: [], checkedAt: null };
@@ -152,6 +163,7 @@ export class SetupEngine extends EventEmitter {
       installRoot: this.state.installRoot,
       manifestId: m?.manifestId ?? null,
       placeholderManifest: Boolean(m?.placeholder),
+      waitingForManifest: this.waitingForManifest,
       elevationNotice: this.elevationNotice,
       consentNotice:
         android?.enabled && android.id === 'android' && android.acceptLicenses
@@ -171,7 +183,7 @@ export class SetupEngine extends EventEmitter {
       await this.loadManifest(true);
       this.emitNow();
     } catch (err) {
-      this.error = errMsg(err);
+      this.error = notPublished(err) ? null : errMsg(err);
       this.emitNow();
     }
   }
@@ -293,8 +305,13 @@ export class SetupEngine extends EventEmitter {
           : 'Setup did not finish. Press Retry.';
       }
     } catch (err) {
-      this.error = errMsg(err) === 'cancelled' ? 'Setup cancelled.' : errMsg(err);
-      log.error(`setup run failed: ${this.error}`);
+      if (notPublished(err)) {
+        this.error = null;
+        log.info('setup manifest not published yet');
+      } else {
+        this.error = errMsg(err) === 'cancelled' ? 'Setup cancelled.' : errMsg(err);
+        log.error(`setup run failed: ${this.error}`);
+      }
       this.state.complete = false;
       this.save();
     } finally {
@@ -399,8 +416,21 @@ export class SetupEngine extends EventEmitter {
   }
 
   private async loadManifest(allowCached: boolean): Promise<ManifestPayload> {
-    const { manifest, fromCache } = await this.deps.manifestSource.load({ allowCached });
+    let loaded: Awaited<ReturnType<ManifestSource['load']>>;
+    try {
+      loaded = await this.deps.manifestSource.load({ allowCached });
+    } catch (err) {
+      if (notPublished(err)) this.waitForPublish();
+      throw err;
+    }
+    const { manifest, fromCache } = loaded;
     if (fromCache) log.info('using cached manifest (server unreachable)');
+    if (this.waitingForManifest) {
+      this.waitingForManifest = false;
+      if (this.recheckTimer) clearTimeout(this.recheckTimer);
+      this.recheckTimer = null;
+      this.emit('published');
+    }
     if (this.state.manifestId !== manifest.manifestId) {
       this.state.manifestId = manifest.manifestId;
       this.save();
@@ -414,6 +444,17 @@ export class SetupEngine extends EventEmitter {
       }
     }
     return manifest;
+  }
+
+  /** Keep asking until the organizers publish; the app announces it via 'published'. */
+  private waitForPublish() {
+    this.waitingForManifest = true;
+    if (this.recheckTimer) return;
+    this.recheckTimer = setTimeout(() => {
+      this.recheckTimer = null;
+      void this.prepare();
+    }, PUBLISH_RECHECK_MS);
+    this.recheckTimer.unref?.();
   }
 
   private context(manifest: ManifestPayload, quick = false): ComponentContext {
