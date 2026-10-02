@@ -13,7 +13,8 @@ export const DEFAULT_SETTINGS: Settings = {
   minDiskGb: DEFAULT_MIN_DISK_GB,
   minAppVersion: '0.1.0',
   components: { android: true, java: true, chrome: true, vscode: true, warmup: true },
-  gradleWarmup: false,
+  // Setup happens at home, so pre-fetch Gradle/NDK there; APK builds at the venue need no downloads.
+  gradleWarmup: true,
   androidPlatform: 'platforms;android-36',
   androidBuildTools: 'build-tools;36.0.0',
   androidNdk: null,

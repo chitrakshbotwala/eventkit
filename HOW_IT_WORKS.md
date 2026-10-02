@@ -25,13 +25,20 @@ The admin site is a web page served by the server itself, so there are only two 
                      organizers / door volunteers (browser) ──────┘
 ```
 
-## An attendee's day
+## An attendee's journey
 
-1. **Download and install EventKit.** It's a one-click installer and needs no admin password on Windows.
+Everything that needs a download happens **at home, before the event**. The venue provides no download capacity, and nothing is downloaded there.
+
+**At home (days before the event)**
+
+1. **Download and install EventKit** from the link in the event email. It's a one-click installer and needs no admin password on Windows.
 2. **Continue with Google.** The browser opens and the attendee picks their Google account. If that email is on the RSVP list, they're in.
-3. **Set up my laptop.** One button. The app installs Git, the Flutter SDK, Java 17, the Android SDK, Chrome, VS Code with the Flutter extensions and Flutter DevTools. It also pre-downloads a starter project so it builds offline. The attendee can watch a progress bar or walk away.
+3. **Set up my laptop.** One button. The app installs Git, the Flutter SDK, Java 17, the Android SDK, Chrome, VS Code with the Flutter extensions and Flutter DevTools. It also pre-downloads a starter project, its packages and (for Android builds) the Gradle build cache, so everything builds offline. The attendee can watch a progress bar or walk away.
 4. **Ready.** Once everything is verified, the app shows a QR code that changes every minute.
-5. **At the door** a volunteer scans the QR. ✓ Checked in.
+
+**At the venue**
+
+5. **At the door** a volunteer scans the QR. The laptop needs no internet for this. ✓ Checked in.
 6. **Offline phase.** At a set time the attendee disconnects from the internet and builds with what's installed. EventKit records whether the laptop really stayed offline.
 7. **Afterwards** they reconnect, and the app uploads its record by itself.
 
@@ -63,13 +70,13 @@ Why each piece is there:
 - **System browser, not a window inside the app.** Attendees type their Google password only on Google's real page, with their saved logins and 2-step verification.
 - **Client secret on the server only.** The installer contains nothing secret about the Google project.
 - **Loopback listener plus PKCE.** The one-time code goes to `127.0.0.1` on the attendee's own laptop. It is useless without the verifier `V`, which never leaves the app. The code also expires after 2 minutes and works only once.
-- **Verified email to RSVP list.** This is the only identity check. If someone RSVP'd with a different address, the app says so and the help desk edits their RSVP email.
+- **Verified email to RSVP list.** This is the only identity check. If someone RSVP'd with a different address, the app says so and an organizer edits their RSVP email.
 
 After sign-in, the app stores the session token and a per-laptop **device key** in the OS keychain (`safeStorage`). The device key later signs the readiness report and the offline log.
 
 ### 2. One-click setup
 
-**The manifest.** The server publishes a list of what to install for each OS and CPU: exact versions, download URLs and a SHA-256 fingerprint for every file. Organizers choose the versions in the admin settings, for example pinning Flutter 3.35.4. The server fills in the upstream URLs and hashes, then **signs the list with an Ed25519 key**. The app has the public key built in and refuses any list that is unsigned, altered or expired. Even someone controlling the network, or the venue mirror, cannot make laptops install something else.
+**The manifest.** The server publishes a list of what to install for each OS and CPU: exact versions, download URLs and a SHA-256 fingerprint for every file. Organizers choose the versions in the admin settings, for example pinning Flutter 3.35.4. The server fills in the upstream URLs and hashes, then **signs the list with an Ed25519 key**. The app has the public key built in and refuses any list that is unsigned, altered or expired. Even someone controlling the network cannot make laptops install something else.
 
 **The setup engine** in the desktop app works through components in order:
 
@@ -80,16 +87,18 @@ system check → (Linux packages) → Git → Flutter → Java → Android SDK �
 For each component it:
 
 1. **Detects** whether a good version is already installed, and skips it if so.
-2. **Downloads**, two files at a time. Downloads resume after Wi-Fi drops because they use HTTP Range requests and the progress is saved. If the organizers set up a **LAN mirror**, it uses that first. Every file is checked against its SHA-256 before use.
+2. **Downloads**, two files at a time. Downloads resume after Wi-Fi drops because they use HTTP Range requests and the progress is saved. Every file is checked against its SHA-256 before use. Files come straight from the upstream CDNs (Google, GitHub, Adoptium, Microsoft) to the attendee's home connection, not through the event server.
 3. **Installs** without admin rights wherever possible. Windows installs are per-user. Linux asks for the password once. macOS needs it only for Rosetta and Xcode's command-line tools.
 4. **Updates PATH** and environment variables, so `flutter` works in new terminals.
 5. **Verifies**: runs `flutter doctor -v`, then builds the starter project offline (`pub get --offline`), so the offline phase won't surprise anyone.
 
-Progress streams to the server, so the help desk can see who is stuck and why. State is saved after every step, so closing the app or rebooting resumes where it left off.
+Progress streams to the server, so organizers can see who is stuck and why, and help before the event. State is saved after every step, so closing the app or rebooting resumes where it left off.
 
 ### 3. Ready, and the attendance QR
 
 When setup finishes, the app sends a **readiness report** listing every component, its version and the doctor results, signed with the device key. The server does not just believe it. It re-checks the report against the current manifest: required components present, versions right, doctor categories passing. Only then does it mark the attendee **ready** and give the app a secret for their QR code.
+
+The app sends a fresh report every 10 minutes while online, checked against the settings of that moment. That's why organizers **freeze the toolchain** (pinned version, components, starter project) once attendees start setting up: a later change would turn "Ready" laptops "not ready", and fixing that would mean downloading again, possibly at the venue.
 
 **The QR** is `EK1.<attendee>.<minute>.<8-digit code>`, where the code is a keyed hash (HMAC) of the secret and the current minute.
 
@@ -148,15 +157,15 @@ Gaps under 60 seconds are ignored. Without that, every laptop would show a gap a
 
 ### 5. Organizer tools (admin site)
 
-| Page                | What it's for                                                                                         |
-| ------------------- | ----------------------------------------------------------------------------------------------------- |
-| **Overview**        | Live counters: RSVPs, signed in, installing, ready, checked in, phase-2 results                       |
-| **Attendees**       | RSVP import (CSV from Luma, Meetup, Google Forms…), status, per-laptop setup progress, edit emails    |
-| **Scanner**         | Door check-in: camera, handheld scanner, manual lookup                                                |
-| **Attendance**      | Who checked in, when, how and by whom, with CSV/XLSX export                                           |
-| **Phase 2 control** | Schedule, mode, grace, Start now / End now                                                            |
-| **Monitoring**      | Per-attendee verdict, live feed, export                                                               |
-| **Settings**        | Versions, components, LAN mirror, starter project, Google sign-in status, admin users, 2FA, audit log |
+| Page                | What it's for                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------- |
+| **Overview**        | Live counters: RSVPs, signed in, installing, ready, checked in, phase-2 results                    |
+| **Attendees**       | RSVP import (CSV from Luma, Meetup, Google Forms…), status, per-laptop setup progress, edit emails |
+| **Scanner**         | Door check-in: camera, handheld scanner, manual lookup                                             |
+| **Attendance**      | Who checked in, when, how and by whom, with CSV/XLSX export                                        |
+| **Phase 2 control** | Schedule, mode, grace, Start now / End now                                                         |
+| **Monitoring**      | Per-attendee verdict, live feed, export                                                            |
+| **Settings**        | Versions, components, starter project, Google sign-in status, admin users, 2FA, audit log          |
 
 Admins sign in with a password and optional 2FA (any authenticator app). There are two roles:
 
@@ -198,4 +207,3 @@ Treat **compliant** as "no evidence of a violation" and **violation** as "worth 
 - **Hash chain:** each log line includes the fingerprint of the previous one, so removing a line is detectable.
 - **PKCE:** "proof key for code exchange". It ties a sign-in code to the app that started the sign-in.
 - **Loopback:** `127.0.0.1`, the laptop talking to itself. It's used to hand the sign-in back from the browser to the app.
-- **LAN mirror:** a copy of all downloads on the venue network, so 100 laptops don't share one internet uplink.
