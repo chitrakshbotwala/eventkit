@@ -3,12 +3,16 @@ name: Release desktop app
 # Builds every installer, installs and launches each one, and publishes them as a GitHub
 # Release that attendees download from (README → "Releasing the desktop app").
 #
-#   Actions → "Release desktop app" → Run workflow, version 0.2.0
-#       bumps apps/desktop/package.json on main, tags v0.2.0, builds, tests, publishes.
-#   Run workflow with no version
-#       test build: everything is built and launch-tested, nothing is published.
+#   Actions → "Release desktop app" → Run workflow
+#       releases the version in apps/desktop/package.json (if it isn't released yet).
+#   ... with a version, e.g. 0.2.0
+#       sets apps/desktop/package.json to it on main first.
+#   ... with "Test build only" ticked
+#       everything is built and launch-tested, nothing is published.
 #   git push origin v0.2.0
 #       same as the button, for a tag you made yourself (must match package.json).
+#
+# The v<version> tag is created when the release is published, after every test passed.
 #
 # A version with a suffix (0.3.0-rc.1) becomes a pre-release: installed apps never
 # auto-update to it, and it is not shown as "Latest".
@@ -27,9 +31,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, e.g. 0.2.0. Leave empty for a test build (nothing is published).'
+        description: 'Version to release, e.g. 0.2.0. Empty: the version in apps/desktop/package.json.'
         required: false
         default: ''
+      test_only:
+        description: 'Test build only: build and launch-test everything, publish nothing'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -71,29 +79,33 @@ jobs:
         shell: bash
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          TEST_ONLY: ${{ inputs.test_only }}
         run: |
           set -euo pipefail
           current=$(node -p "require('./apps/desktop/package.json').version")
+          version=${INPUT_VERSION#v}
+          version=${version:-$current}
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a version like 0.2.0 or 0.3.0-rc.1"; exit 1
+          fi
+
           if [ "$GITHUB_EVENT_NAME" = push ]; then
             version=${GITHUB_REF_NAME#v}
             if [ "$version" != "$current" ]; then
               echo "::error::Tag $GITHUB_REF_NAME does not match apps/desktop/package.json version $current"; exit 1
             fi
-            ref=$GITHUB_REF_NAME
+            ref=$GITHUB_SHA
             publish=true
-          elif [ -n "$INPUT_VERSION" ]; then
-            version=${INPUT_VERSION#v}
-            if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
-              echo "::error::'$INPUT_VERSION' is not a version like 0.2.0 or 0.3.0-rc.1"; exit 1
-            fi
+          elif [ "$TEST_ONLY" = true ]; then
+            ref=$GITHUB_SHA
+            publish=false
+          else
             if [ "$GITHUB_REF_NAME" != main ]; then
-              echo "::error::Run releases from main (this run is on $GITHUB_REF_NAME)"; exit 1
+              echo "::error::Run releases from main (this run is on $GITHUB_REF_NAME), or tick \"Test build only\""; exit 1
             fi
             if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
-              echo "::error::v$version already exists. Pick a new version."; exit 1
+              echo "::error::v$version is already released. Enter a new version in the version box, e.g. the next patch."; exit 1
             fi
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             if [ "$version" != "$current" ]; then
               node -e "
                 const fs = require('fs');
@@ -102,17 +114,13 @@ jobs:
                 j.version = process.argv[1];
                 fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
               " "$version"
+              git config user.name 'github-actions[bot]'
+              git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
               git commit -qm "release: v$version" apps/desktop/package.json
               git push origin HEAD:main
             fi
-            git tag -a "v$version" -m "EventKit $version"
-            git push origin "v$version"
-            ref=v$version
+            ref=$(git rev-parse HEAD)
             publish=true
-          else
-            version=$current
-            ref=$GITHUB_SHA
-            publish=false
           fi
           prerelease=false
           [[ "$version" == *-* ]] && prerelease=true
@@ -122,7 +130,11 @@ jobs:
             echo "publish=$publish"
             echo "prerelease=$prerelease"
           } >> "$GITHUB_OUTPUT"
-          echo "### EventKit $version (publish: $publish, pre-release: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$publish" = true ]; then
+            echo "### Releasing EventKit $version$([ "$prerelease" = true ] && echo ' (pre-release)')" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Test build of EventKit $version: nothing will be published" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   build:
     name: Build ${{ matrix.name }}
@@ -338,7 +350,9 @@ jobs:
       - uses: softprops/action-gh-release@v2
         if: needs.prepare.outputs.publish == 'true'
         with:
+          # Creates the tag on the tested commit if it doesn't exist yet.
           tag_name: v${{ needs.prepare.outputs.version }}
+          target_commitish: ${{ needs.prepare.outputs.ref }}
           name: EventKit ${{ needs.prepare.outputs.version }}
           body_path: ${{ runner.temp }}/notes.md
           generate_release_notes: true
