@@ -208,7 +208,7 @@ function ToolchainSection({ settings }: { settings: Settings }) {
             checked={form.gradleWarmup}
             onChange={(v) => set('gradleWarmup', v)}
             label="Gradle warm-up (flutter build apk --debug)"
-            description="Large download; enable if attendees must build APKs offline."
+            description="Large download (done at home during setup). Needed to build APKs at the venue without internet."
             disabled={!form.components.android}
           />
         </div>

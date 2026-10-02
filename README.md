@@ -157,37 +157,44 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
 
 ## Event-day runbook
 
-### Two weeks before
+Attendees install and set up EventKit **at home, before the event**, and arrive with a laptop that already shows "Ready". Nothing is downloaded at the venue: the QR code, the starter project, the pub and Gradle caches and the offline-phase monitor all work without internet.
+
+### Three to four weeks before
 
 1. Deploy the server ([below](#deploying-the-server-vps)) and set up [Google sign-in](#google-sign-in-setup). Check Admin → Settings → Attendee sign-in: it should say "Google".
 2. Settings → Toolchain:
    - pin the Flutter version you will teach;
    - set the minimum free disk space;
-   - set the minimum app version.
-   - Turn the NDK on together with the Gradle warm-up if attendees must build APKs offline.
+   - set the minimum app version;
+   - keep **Gradle warm-up** on (the default) if attendees will build Android APKs. It fetches Gradle, the Android build dependencies and the NDK at home, so APK builds at the venue need no internet.
 3. Settings → Manifest: upload the starter project zip, then **Refresh manifest**. It must show "signed, resolved", not "placeholder".
-4. Build and sign the installers with the release workflow. Copy the release files into `DATA_DIR/updates/`. Publish download links (for example on the event page).
-5. **Run a real setup on a fresh VM or laptop for each OS** (Windows 11, macOS on Apple Silicon, Ubuntu LTS). It must reach "Ready". Simulate mode does not exercise the real installers.
-6. Import the RSVP CSV (Attendees → Import). Any export with an email column works, plus optionally a name column or first/last name columns. Tell attendees to sign in with the Google account of the email they RSVP'd with.
+4. Build and sign the installers with the release workflow (see [Building installers](#building-installers-and-auto-update)). The repository is private, so attendees can't download from its GitHub releases. Copy the release files into `DATA_DIR/updates/` on the VPS instead; they are then public at `https://<your-server>/updates/<file>`. Put those links on the event page.
+5. **Run a real setup on a fresh VM or laptop for each OS** (Windows 11, macOS on Apple Silicon, Ubuntu LTS), on a normal home connection. It must reach "Ready". Note how long it takes and how much it downloads (several GB), and put both in the attendee email. Simulate mode does not exercise the real installers.
+6. Import the RSVP CSV (Attendees → Import). Any export with an email column works, plus optionally a name column or first/last name columns.
 7. Create volunteer accounts (Settings → Admin users) and turn on 2FA for every superadmin.
+
+### Two weeks before: attendees set up at home
+
+1. Email attendees the download links, the "Ready by" date (for example two days before the event), the expected time and download size, and: "Sign in with the Google account of the email you RSVP'd with."
+2. **Freeze the toolchain.** Don't change the pinned Flutter version, components, Android packages or the starter project after attendees start setting up. The app re-checks every laptop against the current settings, so a change turns "Ready" laptops "not ready", and fixing that needs downloads. Publish any desktop app update **before** this point too. An update published later is downloaded wherever the laptop is, including the venue.
+3. Support people remotely. Overview shows who is still installing or needs repair, and the attendee drawer shows per-component progress and errors.
+4. A few days before the "Ready by" date, filter Attendees by status and remind everyone who isn't **Ready**.
 
 ### The day before
 
-1. Optional LAN mirror. Run `pnpm --filter @eventkit/server mirror:sync`, then set **LAN mirror URL** to `http://<server-lan-ip>:8080/mirror`. Clients try the mirror first and fall back to upstream. Every file is still SHA-256-verified.
-2. Phase 2 control: set the window, time zone, mode (strict or lenient), grace period and heartbeat. Attendee apps pick up the schedule every minute while online.
-3. Check the door devices. Open `/scanner` on each phone or laptop and test the camera, the handheld scanner and manual lookup.
+1. Phase 2 control: set the window, time zone, mode (strict or lenient), grace period and heartbeat. Attendee apps pick up the schedule every minute while online.
+2. Check the door devices. Open `/scanner` on each phone or laptop and test the camera, the handheld scanner and manual lookup. Door devices need to reach the server, so give them mobile data if the venue Wi-Fi is unreliable.
 
 ### At the door
 
-- Attendees open EventKit → **Profile & QR** and show the code. It rotates every minute, so screenshots stop working.
+- Attendees open EventKit → **Profile & QR** and show the code. The code is computed on the laptop, so it works without internet. It rotates every minute, so screenshots stop working.
 - A scan shows ✓ checked in, ↺ already checked in (no double counting), ✗ not ready, or expired/invalid.
-- A superadmin can do a manual check-in from the scanner's manual lookup. It requires a reason and is audit-logged. Volunteers can look people up but cannot check them in manually.
+- **Not ready** means setup wasn't finished at home, and it can't be finished at the venue. A superadmin can still check the person in manually from the scanner's manual lookup, with a reason that goes into the audit log. Volunteers can look people up but cannot check them in manually.
 
-### Setup help desk
+### Setup help (before the event)
 
 - "Not on the RSVP list" at sign-in means the attendee's Google email differs from their RSVP email. Edit their email in Attendees to the Google one, then have them click **Continue with Google** again.
-- Overview shows who is installing or needs repair. The attendee drawer shows their per-component progress and errors.
-- On the laptop: Setup → "Show live log" and "Copy diagnostics". Setup resumes after network drops and app restarts, so clicking **Retry** is usually enough.
+- Ask the attendee for Setup → "Copy diagnostics" (and "Show live log"). Setup resumes after network drops and app restarts, so **Retry** is usually enough.
 - Common fixes:
   - low disk: free space and retry;
   - corporate proxy: the app uses system proxy settings;
@@ -201,7 +208,7 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
    - laptops still online after the grace period appear as violations within seconds;
    - laptops that quit the app show a monitoring gap once their log arrives.
 3. Use **Start now** or **End now** to adjust the window live. Clients pick up the change within a minute.
-4. After the phase, ask everyone to reconnect. Logs upload automatically. The status settles from "unverified" to its final value once a verified log covers the whole window.
+4. After the phase, ask everyone to reconnect. Logs upload automatically. The status settles from "unverified" to its final value once a verified log covers the whole window. Laptops that only get online after leaving the venue upload from wherever they are.
 5. Export: Monitoring → CSV/XLSX, and Attendance → CSV/XLSX (name, email, time, method, scanner).
 
 ### After the event
@@ -209,19 +216,13 @@ Treat "compliant" as "no evidence of a violation", not as proof. Use the monitor
 - Export attendance and monitoring, then archive the database (`deploy/backup.sh`).
 - Rotate the manifest key if it might have leaked. Print a new pair with `node scripts/gen-keys.mjs --print` and ship a build that trusts both public keys. Then switch the server to the new private key, and drop the old public key from later builds.
 
-## LAN mirror
+## LAN mirror (optional, not used for home setup)
 
-Venue Wi-Fi rarely survives 100 people downloading Android SDKs at once. The server can mirror every artifact:
-
-```sh
-pnpm --filter @eventkit/server mirror:sync   # downloads and verifies each artifact into DATA_DIR/mirror
-```
-
-Then set Admin → Settings → **LAN mirror URL** to `http://<lan-ip>:8080/mirror` (or point it at nginx serving the same directory). The manifest stays signed, and each file keeps its upstream SHA-256, so the mirror cannot substitute binaries. Plain HTTP on the LAN is fine. Clients try the mirror first and fall back to the upstream URL.
+Only useful if you ever run an in-person setup session, where many laptops would download the toolchain over one venue connection. `pnpm --filter @eventkit/server mirror:sync` copies every manifest artifact into `DATA_DIR/mirror`, which the server serves at `/mirror/`. Set its URL under Admin → Settings → **LAN mirror URL**. The manifest stays signed and every file keeps its upstream SHA-256, so the mirror cannot substitute binaries. Leave the setting empty when attendees set up at home.
 
 ## Deploying the server (VPS)
 
-A small VPS is enough: 1 vCPU, 1–2 GB RAM, Ubuntu 24.04. Add 30 GB of disk if it also hosts the mirror. The server is one Node process behind Caddy, which handles HTTPS automatically. It uses SQLite on local disk. Commands are for Ubuntu and run as root unless noted.
+A small VPS is enough: 1 vCPU, 1–2 GB RAM, Ubuntu 24.04. Allow some bandwidth for the installer downloads it hosts (about 100 MB per attendee); the toolchain itself comes from the upstream CDNs, not the VPS. The server is one Node process behind Caddy, which handles HTTPS automatically. It uses SQLite on local disk. Commands are for Ubuntu and run as root unless noted.
 
 1. **DNS.** Point an A/AAAA record (for example `event.example.org`) at the VPS.
 2. **Packages.**
