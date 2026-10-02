@@ -14,7 +14,7 @@ const only = process.argv
   .split(',');
 
 if (!existsSync(resolve(root, 'apps/server/.env'))) {
-  console.error('apps/server/.env missing: run `pnpm setup` first.');
+  console.error('apps/server/.env missing: run `pnpm bootstrap` first.');
   process.exit(1);
 }
 
