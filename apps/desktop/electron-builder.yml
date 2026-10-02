@@ -3,6 +3,10 @@
 appId: org.eventkit.desktop
 productName: EventKit
 copyright: Copyright © 2026 Event organizers
+# The workspace name (@eventkit/desktop) would otherwise name the Windows install folder
+# and the Linux package. The data folder follows productName and doesn't change.
+extraMetadata:
+  name: eventkit
 
 directories:
   output: release

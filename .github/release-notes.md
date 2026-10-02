@@ -21,7 +21,7 @@ Not sure which Mac you have? Apple menu â†’ **About This Mac**: "Chip: Apple Mâ€
 - **Ubuntu / Debian:** `sudo apt install ./EventKit-{{VERSION}}-x64.deb`
 - **Fedora:** `sudo dnf install ./EventKit-{{VERSION}}-x64.rpm`
 - **Arch:** `sudo pacman -U EventKit-{{VERSION}}-x64.pkg.tar.xz`
-- **AppImage:** `chmod +x EventKit-{{VERSION}}-x64.AppImage`, then run it. On Ubuntu 24.04 and later, use the .deb instead: Ubuntu blocks the AppImage's sandbox.
+- **AppImage:** `chmod +x EventKit-{{VERSION}}-x64.AppImage`, then run it. If it says "AppImages require FUSE", install FUSE 2 (`libfuse2` on most distros, `fuse2` on Arch). On Ubuntu 24.04 and later, use the .deb instead: Ubuntu blocks the AppImage's sandbox.
 
 Linux builds run on both Wayland and X11. Windows and the AppImage update themselves; the other Linux packages update when you install a newer version.
 

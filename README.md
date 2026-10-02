@@ -335,7 +335,7 @@ The `.zip`, `.blockmap` and `latest*.yml` files in a release are for auto-update
 
 **Wayland and X11.** One Linux build runs on both. Electron uses Wayland natively when the session provides it, and X11 (or XWayland) otherwise. The window is tied to its desktop entry through the app id `eventkit` (`desktopName` in `apps/desktop/package.json`, `StartupWMClass` in the package), so docks show the right icon and name on both. On GNOME the tray icon needs the AppIndicator extension. Without it, launching EventKit again brings the window back.
 
-**AppImage on Ubuntu 24.04 and later.** Ubuntu blocks the unprivileged user namespaces that Chromium's sandbox uses, so the AppImage fails to start there. The `.deb` installs the sandbox helper properly, so tell Ubuntu users to use the `.deb`.
+**AppImage needs FUSE 2** (`libfuse2`, or `fuse2` on Arch), which some distros no longer install by default. If it says "AppImages require FUSE", install that or use the distro's package. **On Ubuntu 24.04 and later**, Ubuntu also blocks the unprivileged user namespaces that Chromium's sandbox uses, so the AppImage fails to start there. The `.deb` installs the sandbox helper properly, so tell Ubuntu users to use the `.deb`.
 
 **Launch tests.** With `EVENTKIT_SMOKE_TEST=<file>`, a packaged build opens its window on a throwaway profile, makes one IPC round trip from the page, writes the result to the file and quits. `scripts/smoke-test.sh` wraps this. The release workflow runs it on:
 

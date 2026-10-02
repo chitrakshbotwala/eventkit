@@ -218,7 +218,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends xvfb weston dbus-daemon
+          # AppImages need FUSE 2, which Ubuntu 22.04+ doesn't install by default (nor for users).
+          sudo apt-get install -y --no-install-recommends xvfb weston dbus-daemon libfuse2t64
           # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's sandbox uses.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           appimage=$(ls apps/desktop/release/*.AppImage)
