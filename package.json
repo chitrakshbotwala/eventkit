@@ -16,7 +16,7 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r run test",
     "keys:gen": "node scripts/gen-keys.mjs",
-    "setup": "node scripts/setup.mjs"
+    "bootstrap": "node scripts/bootstrap.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
