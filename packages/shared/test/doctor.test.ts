@@ -96,6 +96,28 @@ describe('evaluateDoctor', () => {
     expect(r.warnings.some((w) => w.startsWith('VS Code'))).toBe(true);
   });
 
+  it('accepts "license status unknown" (Flutter < 3.47 with cmdline-tools 23+) only when licenses are verified locally', () => {
+    const summary =
+      parseFlutterDoctor(`[✓] Flutter (Channel stable, 3.44.6, on Microsoft Windows [Version 10.0.26200], locale en-IN)
+[!] Android toolchain - develop for Android devices (Android SDK version 36.1.0)
+    • Android SDK at C:\\Users\\dev\\AppData\\Local\\Android\\Sdk
+    X Android license status unknown.
+      Run \`flutter doctor --android-licenses\` to accept the SDK licenses.
+      See https://flutter.dev/to/windows-android-setup for more details.
+[✓] Chrome - develop for the web
+[✓] VS Code (version 1.140.0)
+`);
+    expect(evaluateDoctor(summary, opts).passed).toBe(false);
+    const r = evaluateDoctor(summary, { ...opts, androidLicensesVerifiedLocally: true });
+    expect(r.passed).toBe(true);
+    expect(r.warnings.some((w) => w.includes('license status unknown'))).toBe(true);
+    // Unaccepted licenses still fail, even with the local check.
+    const notAccepted = parseFlutterDoctor(fixture('macos-licenses-fail.txt'));
+    expect(
+      evaluateDoctor(notAccepted, { ...opts, androidLicensesVerifiedLocally: true }).passed,
+    ).toBe(false);
+  });
+
   it('requires VS Code: uses local verification when doctor omits it', () => {
     const summary = parseFlutterDoctor(fixture('no-vscode.txt'));
     expect(evaluateDoctor(summary, opts).passed).toBe(true);

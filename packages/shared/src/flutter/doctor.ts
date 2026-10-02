@@ -124,7 +124,16 @@ export interface DoctorEvaluationOptions {
   androidRequired: boolean;
   /** Whether our own VS Code component verified VS Code (doctor omits it when not found). */
   vscodeVerifiedLocally: boolean;
+  /**
+   * Whether our own Android component found the accepted SDK license. Flutter before 3.47
+   * can't read the license status from Android cmdline-tools 23+ (which answers
+   * `--licenses` with "no longer needed") and reports it as unknown; with the license
+   * verified locally, that alone is only a warning.
+   */
+  androidLicensesVerifiedLocally?: boolean;
 }
+
+const LICENSE_STATUS_UNKNOWN = /license status unknown/i;
 
 export interface DoctorEvaluation {
   passed: boolean;
@@ -182,7 +191,17 @@ export function evaluateDoctor(
   for (const key of strictRequired) {
     const c = best(cats, key);
     if (!c) failures.push(`${LABELS[key]}: not reported by flutter doctor`);
-    else if (c.status !== 'ok') failures.push(describe(c));
+    else if (c.status === 'ok') {
+      /* pass */
+    } else if (
+      key === 'android' &&
+      opts.androidLicensesVerifiedLocally &&
+      c.status === 'partial' &&
+      [...c.errors, ...c.warnings].length > 0 &&
+      [...c.errors, ...c.warnings].every((issue) => LICENSE_STATUS_UNKNOWN.test(issue))
+    ) {
+      warnings.push(describe(c));
+    } else failures.push(describe(c));
   }
 
   const vscode = best(cats, 'vscode');
