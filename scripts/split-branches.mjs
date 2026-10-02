@@ -39,7 +39,7 @@ const TARGETS = [
       'scripts/split-branches.mjs',
     ],
     about:
-      'The Electron desktop app and the shared package. Push a tag like v0.2.0 on this branch to build signed installers with .github/workflows/release.yml. See README → "Building installers and auto-update".',
+      'The Electron desktop app and the shared package. Releases are built from main with the "Release desktop app" workflow (.github/workflows/release.yml). See README → "Releasing the desktop app".',
   },
 ];
 

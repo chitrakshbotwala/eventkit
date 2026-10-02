@@ -80,7 +80,7 @@ deploy            VPS files: Caddyfile, systemd unit, production .env template, 
 | --------- | --------------------------------------------------------- | -------------------------------------------------- |
 | `main`    | Everything. All development happens here and CI runs here | (source of truth)                                  |
 | `server`  | `packages/shared`, `apps/server`, `apps/admin`, `deploy/` | Cloned on the VPS, updated with `deploy/update.sh` |
-| `desktop` | `packages/shared`, `apps/desktop`, the release workflow   | Tag `v*` here to build installers                  |
+| `desktop` | `packages/shared`, `apps/desktop`, the release workflow   | Releases are built from `main` (see below)         |
 
 `server` and `desktop` are generated from `main` by `scripts/split-branches.mjs`. The `Sync deploy branches` workflow runs it after CI passes on `main`. Each sync adds a commit on top, with no force pushes, so `git pull` keeps working on the VPS. Never commit to those branches directly.
 
@@ -110,6 +110,8 @@ deploy            VPS files: Caddyfile, systemd unit, production .env template, 
 | ---------------------------- | ------------------------------------------------------------------------------------ |
 | `MAIN_VITE_API_BASE_URL`     | The event server. Packaged builds refuse anything but `https://` (or localhost)      |
 | `MAIN_VITE_MANIFEST_PUBKEYS` | Comma-separated Ed25519 public keys. Several keys allow rotation without a new build |
+| `MAIN_VITE_UPDATE_REPO`      | `owner/repo` whose GitHub Releases feed auto-update. Set by the release workflow     |
+| `MAIN_VITE_MAC_SIGNED`       | `1` for Developer ID-signed Mac builds; macOS auto-update is off otherwise           |
 
 ## Security model
 
@@ -169,8 +171,8 @@ Attendees install and set up EventKit **at home, before the event**, and arrive 
    - set the minimum app version;
    - keep **Gradle warm-up** on (the default) if attendees will build Android APKs. It fetches Gradle, the Android build dependencies and the NDK at home, so APK builds at the venue need no internet.
 3. Settings → Manifest: upload the starter project zip, then **Refresh manifest**. It must show "signed, resolved", not "placeholder".
-4. Build and sign the installers with the release workflow (see [Building installers](#building-installers-and-auto-update)). The repository is private, so attendees can't download from its GitHub releases. Copy the release files into `DATA_DIR/updates/` on the VPS instead; they are then public at `https://<your-server>/updates/<file>`. Put those links on the event page.
-5. **Run a real setup on a fresh VM or laptop for each OS** (Windows 11, macOS on Apple Silicon, Ubuntu LTS), on a normal home connection. It must reach "Ready". Note how long it takes and how much it downloads (several GB), and put both in the attendee email. Simulate mode does not exercise the real installers.
+4. Publish the desktop app: Actions → **Release desktop app** → Run workflow with a version (see [Releasing the desktop app](#releasing-the-desktop-app)). Put `https://github.com/<owner>/<repo>/releases/latest` on the event page.
+5. **Run a real setup on a fresh VM or laptop for each OS** (Windows 11, macOS on Apple Silicon, Ubuntu LTS, and any other Linux your attendees use), on a normal home connection. It must reach "Ready". Note how long it takes and how much it downloads (several GB), and put both in the attendee email. Simulate mode does not exercise the real installers.
 6. Import the RSVP CSV (Attendees → Import). Any export with an email column works, plus optionally a name column or first/last name columns.
 7. Create volunteer accounts (Settings → Admin users) and turn on 2FA for every superadmin.
 
@@ -302,28 +304,64 @@ Postgres is optional, for example when you want a managed database. Run `pnpm --
 
 For local development you can add `http://localhost:8080/auth/google/callback` as a second redirect URI on the same client. Or leave `GOOGLE_CLIENT_ID` empty to use the built-in development page; it is refused in production.
 
-## Building installers and auto-update
+## Releasing the desktop app
+
+Attendees download EventKit from this repository's GitHub Releases. Give them `https://github.com/<owner>/<repo>/releases/latest`: it always shows the newest release, with a download table per operating system and install instructions.
+
+**To release:** GitHub → Actions → **Release desktop app** → Run workflow on `main`, with a version such as `0.2.0`. The workflow:
+
+1. bumps `apps/desktop/package.json` on `main` and tags `v0.2.0`;
+2. builds every installer, with the server URL and manifest key from the repository variables `EVENTKIT_SERVER_URL` and `EVENTKIT_MANIFEST_PUBKEYS` built in;
+3. installs and launches each one (see launch tests below). Any failure stops the release;
+4. publishes the release with the download notes from `.github/release-notes.md` and `SHA256SUMS.txt`.
+
+Other ways to run it:
+
+- **No version:** a test build. Everything is built and launch-tested and the installers are attached to the run as artifacts, but nothing is published.
+- **Push a tag** `vX.Y.Z` that matches `apps/desktop/package.json`: releases that commit.
+- **A version with a suffix**, such as `0.3.0-rc.1`: a pre-release. It is not marked "Latest" and installed apps don't update to it, so use it to try a build before attendees get it.
+
+| File                          | For                                                 | Updates itself              |
+| ----------------------------- | --------------------------------------------------- | --------------------------- |
+| `EventKit-Setup-<v>-x64.exe`  | Windows 10 and 11 (Windows on Arm runs it emulated) | yes                         |
+| `EventKit-<v>-arm64.dmg`      | Macs with Apple silicon                             | only if Developer ID signed |
+| `EventKit-<v>-x64.dmg`        | Intel Macs                                          | only if Developer ID signed |
+| `EventKit-<v>-x64.deb`        | Debian, Ubuntu, Mint, Pop!\_OS                      | no: install the new version |
+| `EventKit-<v>-x64.rpm`        | Fedora, RHEL, openSUSE                              | no: install the new version |
+| `EventKit-<v>-x64.pkg.tar.xz` | Arch, Manjaro, EndeavourOS (`pacman -U`)            | no: install the new version |
+| `EventKit-<v>-x64.AppImage`   | any other Linux                                     | yes                         |
+
+The `.zip`, `.blockmap` and `latest*.yml` files in a release are for auto-update.
+
+**Wayland and X11.** One Linux build runs on both. Electron uses Wayland natively when the session provides it, and X11 (or XWayland) otherwise. The window is tied to its desktop entry through the app id `eventkit` (`desktopName` in `apps/desktop/package.json`, `StartupWMClass` in the package), so docks show the right icon and name on both. On GNOME the tray icon needs the AppIndicator extension. Without it, launching EventKit again brings the window back.
+
+**AppImage on Ubuntu 24.04 and later.** Ubuntu blocks the unprivileged user namespaces that Chromium's sandbox uses, so the AppImage fails to start there. The `.deb` installs the sandbox helper properly, so tell Ubuntu users to use the `.deb`.
+
+**Launch tests.** With `EVENTKIT_SMOKE_TEST=<file>`, a packaged build opens its window on a throwaway profile, makes one IPC round trip from the page, writes the result to the file and quits. `scripts/smoke-test.sh` wraps this. The release workflow runs it on:
+
+- the Windows exe, after a silent install;
+- the app inside the arm64 dmg;
+- the AppImage, under Xvfb (X11) and under headless Weston (Wayland);
+- the `.deb` on Ubuntu 24.04 and Debian 12, the `.rpm` on Fedora and the pacman package on Arch. Each is installed with the distro's package manager on a minimal image, which also checks that the declared dependencies are enough to run Electron.
+
+**Auto-update** (electron-updater):
+
+- Installed apps check this repository's releases 30 s after start and then every 4 hours, never during the offline phase. Updates download in the background, are verified against the sha512 in `latest*.yml`, and install on the next quit.
+- Publishing a release therefore updates every attendee's app. Publish the final version **before** attendees start setting up (see the runbook).
+- macOS installs only updates signed with the same Developer ID, so unsigned Mac builds don't auto-update. The `.deb`, `.rpm` and pacman packages update when the attendee installs the new version.
+- A build made outside the release workflow (without `MAIN_VITE_UPDATE_REPO`) checks `<server>/updates/` instead. Copy a release's files, including `latest*.yml`, into `DATA_DIR/updates/` to serve them there.
+
+**Local builds:**
 
 ```sh
 pnpm --filter @eventkit/desktop dist:win     # NSIS one-click, per-user (no UAC)
 pnpm --filter @eventkit/desktop dist:mac     # dmg + zip, arm64 and x64
-pnpm --filter @eventkit/desktop dist:linux   # AppImage + deb
+pnpm --filter @eventkit/desktop dist:linux   # AppImage, deb, rpm, pacman (needs rpm and bsdtar)
 ```
 
 Output goes to `apps/desktop/release/`. Set `MAIN_VITE_API_BASE_URL` (https) and `MAIN_VITE_MANIFEST_PUBKEYS` first, in `apps/desktop/.env` or the environment.
 
-**CI.**
-
-- `.github/workflows/ci.yml` runs format, lint, typecheck, tests and build on Ubuntu, plus desktop tests on Windows and macOS.
-- `.github/workflows/release.yml` builds all three platforms when a `v*` tag is pushed and attaches them to a draft GitHub release. The tag must match `apps/desktop/package.json`.
-- Configure the repository variables `EVENTKIT_SERVER_URL` and `EVENTKIT_MANIFEST_PUBKEYS`, plus the signing secrets below.
-
-**Auto-update** (electron-updater):
-
-- The app checks `<server>/updates/` 30 s after start and then every 4 hours. It never checks during the offline phase.
-- To publish an update, copy every file of a release, including `latest.yml`, `latest-mac.yml` and `latest-linux.yml`, into `DATA_DIR/updates/` on the server.
-- Updates install on the next quit. Downloads are verified with the sha512 in the yml.
-- The deb package updates through apt instead. AppImage, NSIS and the macOS zip self-update.
+**CI.** `.github/workflows/ci.yml` runs format, lint, typecheck, tests and build on Ubuntu, plus desktop tests on Windows and macOS, on every push to `main` and every pull request.
 
 ## Code signing and notarization
 
