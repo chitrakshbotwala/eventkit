@@ -32,11 +32,11 @@ A plain-language walkthrough is in [HOW_IT_WORKS.md](HOW_IT_WORKS.md). Design no
 
 ## Quick start (development)
 
-You need Node.js 22.12+ and pnpm 10 (`corepack enable` provides pnpm).
+You need Node.js 22.12+ and pnpm 10 (`corepack enable` provides pnpm). With Nix, `nix-shell` provides both, plus everything Electron and Prisma need. On Linux, including NixOS, it is an FHS environment, so the binaries pnpm downloads run unpatched.
 
 ```sh
 pnpm install
-pnpm setup          # copies .env files, generates the manifest signing keys, creates and seeds the SQLite DB
+pnpm bootstrap      # copies .env files, generates the manifest signing keys, creates and seeds the SQLite DB
 pnpm dev:simulate   # server :8080, admin site :5173, desktop app in simulate mode
 ```
 
@@ -48,19 +48,20 @@ pnpm dev:simulate   # server :8080, admin site :5173, desktop app in simulate mo
   - `--simulate-speed=4` runs the simulation faster.
 - **Real mode.** `pnpm dev` (without `:simulate`) runs the real installers against your machine. It only works once the manifest is resolved (Admin → Settings → Manifest → Refresh), because placeholder artifacts are refused outside simulate mode.
 
-| Command                                           | What it does                                      |
-| ------------------------------------------------- | ------------------------------------------------- |
-| `pnpm dev` / `pnpm dev:simulate`                  | Run server, admin and desktop together            |
-| `pnpm dev -- --only=server,admin`                 | Run a subset                                      |
-| `pnpm test`                                       | Unit and integration tests (Vitest)               |
-| `pnpm lint` / `pnpm typecheck` / `pnpm format`    | ESLint, `tsc`, Prettier                           |
-| `pnpm build`                                      | Build shared, server, admin and desktop           |
-| `pnpm keys:gen`                                   | New Ed25519 manifest key pair                     |
-| `pnpm --filter @eventkit/server admin:create`     | Create or reset an admin user                     |
-| `pnpm --filter @eventkit/server manifest:resolve` | Resolve upstream versions and hashes from the CLI |
-| `pnpm --filter @eventkit/server mirror:sync`      | Download every manifest artifact into the mirror  |
-| `pnpm --filter @eventkit/desktop dist:win`        | Build installers (`dist:mac`, `dist:linux`)       |
-| `node scripts/split-branches.mjs`                 | Rebuild the `server` and `desktop` branches       |
+| Command                                           | What it does                                                                                         |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `pnpm dev` / `pnpm dev:simulate`                  | Run server, admin and desktop together                                                               |
+| `pnpm dev -- --only=server,admin`                 | Run a subset                                                                                         |
+| `pnpm test`                                       | Unit and integration tests (Vitest)                                                                  |
+| `pnpm lint` / `pnpm typecheck` / `pnpm format`    | ESLint, `tsc`, Prettier                                                                              |
+| `pnpm build`                                      | Build shared, server, admin and desktop                                                              |
+| `pnpm bootstrap`                                  | First-time setup: .env files, keys, database, seed data (not `pnpm setup`, which is a pnpm built-in) |
+| `pnpm keys:gen`                                   | New Ed25519 manifest key pair                                                                        |
+| `pnpm --filter @eventkit/server admin:create`     | Create or reset an admin user                                                                        |
+| `pnpm --filter @eventkit/server manifest:resolve` | Resolve upstream versions and hashes from the CLI                                                    |
+| `pnpm --filter @eventkit/server mirror:sync`      | Download every manifest artifact into the mirror                                                     |
+| `pnpm --filter @eventkit/desktop dist:win`        | Build installers (`dist:mac`, `dist:linux`)                                                          |
+| `node scripts/split-branches.mjs`                 | Rebuild the `server` and `desktop` branches                                                          |
 
 ### Repository layout
 
@@ -87,21 +88,21 @@ deploy            VPS files: Caddyfile, systemd unit, production .env template, 
 
 ### Server (`apps/server/.env`)
 
-| Variable                                     | Notes                                                                                                                                 |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                                   | `production` enforces the settings below and disables placeholder artifacts                                                           |
-| `PUBLIC_BASE_URL`                            | Public origin, `https://` required in production                                                                                      |
-| `DATABASE_URL`                               | `file:./dev.db` (SQLite) or `postgresql://...` (see [Deploying](#deploying-the-server-vps))                                           |
-| `DATA_DIR`                                   | Manifest cache, LAN mirror (`mirror/`) and desktop updates (`updates/`)                                                               |
-| `MANIFEST_SIGNING_KEY`                       | Ed25519 private key (from `pnpm keys:gen`). Keep it secret                                                                            |
-| `MIN_APP_VERSION`                            | Older desktop apps are refused at readiness                                                                                           |
-| `EVENT_SLUG`, `EVENT_NAME`, `EVENT_TIMEZONE` | Single event per deployment                                                                                                           |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`   | Google OAuth "Web application" client for attendee sign-in. Required in production. See [Google sign-in setup](#google-sign-in-setup) |
-| `CONTACT_HINT`                               | Shown when a Google account is not on the RSVP list                                                                                   |
-| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`    | First superadmin, created by the seed                                                                                                 |
-| `TRUST_PROXY`                                | `true` behind a reverse proxy, so rate limits see client IPs                                                                          |
-| `ADMIN_ORIGINS`                              | Extra origins allowed to call admin APIs (the Vite dev server)                                                                        |
-| `GITHUB_TOKEN`                               | Optional. Raises the GitHub API limit for the manifest resolver                                                                       |
+| Variable                                     | Notes                                                                                                                                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                   | `production` enforces the settings below and disables placeholder artifacts                                                                                                                    |
+| `PUBLIC_BASE_URL`                            | The server's public address, e.g. `https://event.example.org`: your domain, not the VPS IP. `https://` required in production. See [Choosing the server address](#choosing-the-server-address) |
+| `DATABASE_URL`                               | `file:./dev.db` (SQLite) or `postgresql://...` (see [Deploying](#deploying-the-server-vps))                                                                                                    |
+| `DATA_DIR`                                   | Manifest cache, LAN mirror (`mirror/`) and desktop updates (`updates/`)                                                                                                                        |
+| `MANIFEST_SIGNING_KEY`                       | Ed25519 private key (from `pnpm keys:gen`). Keep it secret                                                                                                                                     |
+| `MIN_APP_VERSION`                            | Older desktop apps are refused at readiness                                                                                                                                                    |
+| `EVENT_SLUG`, `EVENT_NAME`, `EVENT_TIMEZONE` | Single event per deployment                                                                                                                                                                    |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`   | Google OAuth "Web application" client for attendee sign-in. Required in production. See [Google sign-in setup](#google-sign-in-setup)                                                          |
+| `CONTACT_HINT`                               | Shown when a Google account is not on the RSVP list                                                                                                                                            |
+| `SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`    | First superadmin, created by the seed                                                                                                                                                          |
+| `TRUST_PROXY`                                | `true` behind a reverse proxy, so rate limits see client IPs                                                                                                                                   |
+| `ADMIN_ORIGINS`                              | Extra origins allowed to call admin APIs (the Vite dev server)                                                                                                                                 |
+| `GITHUB_TOKEN`                               | Optional. Raises the GitHub API limit for the manifest resolver                                                                                                                                |
 
 ### Desktop build (`apps/desktop/.env`, baked in at build time)
 
@@ -220,11 +221,32 @@ Attendees install and set up EventKit **at home, before the event**, and arrive 
 
 Only useful if you ever run an in-person setup session, where many laptops would download the toolchain over one venue connection. `pnpm --filter @eventkit/server mirror:sync` copies every manifest artifact into `DATA_DIR/mirror`, which the server serves at `/mirror/`. Set its URL under Admin → Settings → **LAN mirror URL**. The manifest stays signed and every file keeps its upstream SHA-256, so the mirror cannot substitute binaries. Leave the setting empty when attendees set up at home.
 
+## Choosing the server address
+
+`PUBLIC_BASE_URL` is the HTTPS address of your server: a **hostname you control** that points at the VPS, such as `https://event.example.org`. It is not the VPS's IP address, because:
+
+- Google sign-in only accepts redirect URIs on a real domain (public top-level domain, listed under Authorized domains), never a bare IP.
+- Caddy gets the HTTPS certificate for that hostname automatically.
+- The address is baked into the desktop installers, so a hostname lets you move to another VPS later by changing DNS only.
+
+To get one, buy a domain (any registrar, roughly $10 a year) or use a subdomain of one you or your community already have. Then add an **A record** pointing at the VPS's public IP (shown in your VPS provider's dashboard, or run `curl -4 ifconfig.me` on the VPS). Check it with `nslookup event.example.org` before starting Caddy.
+
+Use exactly the same value, with no trailing slash, everywhere:
+
+| Where                         | Value                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `apps/server/.env` on the VPS | `PUBLIC_BASE_URL=https://event.example.org`                             |
+| `deploy/Caddyfile`            | `event.example.org {`                                                   |
+| GitHub repository variable    | `EVENTKIT_SERVER_URL=https://event.example.org` (baked into installers) |
+| Google OAuth client           | redirect URI `https://event.example.org/auth/google/callback`           |
+
+Pick it before building installers: changing it later means rebuilding them and every attendee reinstalling.
+
 ## Deploying the server (VPS)
 
 A small VPS is enough: 1 vCPU, 1–2 GB RAM, Ubuntu 24.04. Allow some bandwidth for the installer downloads it hosts (about 100 MB per attendee); the toolchain itself comes from the upstream CDNs, not the VPS. The server is one Node process behind Caddy, which handles HTTPS automatically. It uses SQLite on local disk. Commands are for Ubuntu and run as root unless noted.
 
-1. **DNS.** Point an A/AAAA record (for example `event.example.org`) at the VPS.
+1. **DNS.** Point an A (and AAAA, if the VPS has IPv6) record for your chosen hostname, for example `event.example.org`, at the VPS's IP. See [Choosing the server address](#choosing-the-server-address).
 2. **Packages.**
    ```sh
    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
@@ -270,6 +292,7 @@ Postgres is optional, for example when you want a managed database. Run `pnpm --
 1. Go to [Google Cloud console](https://console.cloud.google.com/) and create a project, for example "EventKit".
 2. **OAuth consent screen** (Google Auth Platform → Branding / Audience):
    - Set the app name and support email. User type: **External**.
+   - **Authorized domains:** add your registered domain, e.g. `example.org` for `event.example.org`. Google only accepts redirect URIs on authorized domains.
    - Scopes are only `openid`, `email` and `profile`. These are non-sensitive, so Google does not need to review the app.
    - **Publish the app** ("In production"). While it is in "Testing", only the test users you list can sign in.
 3. **Credentials** → Create OAuth client ID → **Web application**:
