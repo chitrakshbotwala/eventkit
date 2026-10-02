@@ -5,6 +5,11 @@ Decisions taken without asking. Each one is small and can be reversed.
 ## General
 
 - **Volunteers** (role `volunteer`) can only use the scanner. They can look up attendees by name or email but cannot do manual check-ins. Only superadmins can, and every manual check-in needs a reason, which is audit-logged.
+- **Setup happens at home; nothing is downloaded at the venue** (organizer decision). Attendees finish setup before the event and arrive "Ready".
+  - Gradle warm-up therefore defaults to on, so APK builds at the venue need no internet.
+  - The LAN mirror stays in the code as an option for in-person setup sessions, but is not part of the event plan.
+  - Peer-to-peer seeding was considered and rejected: venue Wi-Fi usually isolates clients, it adds no Wi-Fi capacity, and it would need inbound firewall exceptions on every laptop.
+  - The toolchain must stay frozen once setup starts, because readiness is re-checked against the current manifest.
 - **One event per deployment.** There is an `Event` table, but the server works on the single event named by `EVENT_SLUG`. For multi-tenant use, scope the queries by event id (the columns already exist).
 - **Working names.** The product is called "EventKit" (`@eventkit/*` packages). Change `productName` and `appId` in `apps/desktop/electron-builder.yml` to rebrand it.
 - **Pinned toolchain versions.** TypeScript 5.9, Vite 7, Vitest 3.2, Prisma 6, Fastify 5, Zod 4, React 19, React Router 7, Tailwind 4, Electron 44, electron-vite 5, and electron-builder 26. We picked these over newer majors because the typescript-eslint, electron-vite and Prisma 7 driver-adapter changes are compatible with them.
