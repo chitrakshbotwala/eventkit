@@ -14,11 +14,17 @@ result="$(mktemp -d)/smoke.json"
 EVENTKIT_SMOKE_TEST=$result EVENTKIT_DISABLE_UPDATES=1 "$exe" "$@" &
 pid=$!
 # Portable timeout (macOS has no `timeout`).
-(sleep 150 && kill "$pid" 2>/dev/null && echo "--- timed out after 150 s") &
+(
+  sleep 150 &
+  trap 'kill $! 2>/dev/null; exit 0' TERM
+  wait $!
+  kill "$pid" 2>/dev/null && echo "--- timed out after 150 s"
+) &
 watchdog=$!
 wait "$pid"
 code=$?
 kill "$watchdog" 2>/dev/null
+wait "$watchdog" 2>/dev/null
 
 echo "--- exit code: $code"
 # The result includes the last lines of the app log.

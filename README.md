@@ -321,15 +321,15 @@ Other ways to run it:
 - **Push a tag** `vX.Y.Z` that matches `apps/desktop/package.json`: releases that commit.
 - **A version with a suffix**, such as `0.3.0-rc.1`: a pre-release. It is not marked "Latest" and installed apps don't update to it, so use it to try a build before attendees get it.
 
-| File                          | For                                                 | Updates itself              |
-| ----------------------------- | --------------------------------------------------- | --------------------------- |
-| `EventKit-Setup-<v>-x64.exe`  | Windows 10 and 11 (Windows on Arm runs it emulated) | yes                         |
-| `EventKit-<v>-arm64.dmg`      | Macs with Apple silicon                             | only if Developer ID signed |
-| `EventKit-<v>-x64.dmg`        | Intel Macs                                          | only if Developer ID signed |
-| `EventKit-<v>-x64.deb`        | Debian, Ubuntu, Mint, Pop!\_OS                      | no: install the new version |
-| `EventKit-<v>-x64.rpm`        | Fedora, RHEL, openSUSE                              | no: install the new version |
-| `EventKit-<v>-x64.pkg.tar.xz` | Arch, Manjaro, EndeavourOS (`pacman -U`)            | no: install the new version |
-| `EventKit-<v>-x64.AppImage`   | any other Linux                                     | yes                         |
+| File                             | For                                                 | Updates itself              |
+| -------------------------------- | --------------------------------------------------- | --------------------------- |
+| `EventKit-Setup-<v>-x64.exe`     | Windows 10 and 11 (Windows on Arm runs it emulated) | yes                         |
+| `EventKit-<v>-arm64.dmg`         | Macs with Apple silicon                             | only if Developer ID signed |
+| `EventKit-<v>-x64.dmg`           | Intel Macs                                          | only if Developer ID signed |
+| `EventKit-<v>-amd64.deb`         | Debian, Ubuntu, Mint, Pop!\_OS                      | no: install the new version |
+| `EventKit-<v>-x86_64.rpm`        | Fedora, RHEL, openSUSE                              | no: install the new version |
+| `EventKit-<v>-x86_64.pkg.tar.xz` | Arch, Manjaro, EndeavourOS (`pacman -U`)            | no: install the new version |
+| `EventKit-<v>-x86_64.AppImage`   | any other Linux                                     | yes                         |
 
 The `.zip`, `.blockmap` and `latest*.yml` files in a release are for auto-update.
 

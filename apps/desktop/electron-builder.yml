@@ -152,8 +152,9 @@ pacman:
       mesa,
       alsa-lib,
     ]
-  # pacman -U wants a .pkg.tar.* name; fpm compresses with xz.
-  artifactName: ${productName}-${version}-${arch}.pkg.tar.xz
+  # pacman -U wants a .pkg.tar.* name (fpm compresses with xz). ${arch} would say x64;
+  # Arch, like the AppImage and rpm, calls it x86_64 (the deb says amd64).
+  artifactName: ${productName}-${version}-x86_64.pkg.tar.xz
 
 # Required so electron-builder writes app-update.yml and latest*.yml. The app overrides
 # the URL at runtime with <server>/updates/ (see src/main/updater.ts), so this

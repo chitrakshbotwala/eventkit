@@ -306,10 +306,10 @@ jobs:
           # Containers run as root without the kernel features Chromium's sandbox needs.
           DISPLAY=:99 "${bus[@]}" bash scripts/smoke-test.sh "$exe" --no-sandbox
 
+  # Runs on test builds too: everything except the final publish step.
   release:
-    name: Publish GitHub Release
+    name: ${{ needs.prepare.outputs.publish == 'true' && 'Publish GitHub Release' || 'Check release (test build, not published)' }}
     needs: [prepare, build, linux-packages]
-    if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -329,7 +329,14 @@ jobs:
           (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
           sed -e "s|{{VERSION}}|$VERSION|g" -e "s|{{REPO}}|$GITHUB_REPOSITORY|g" \
             .github/release-notes.md > "$RUNNER_TEMP/notes.md"
+          # Every download link in the notes must be a file in this release.
+          missing=0
+          for f in $(grep -o "releases/download/v$VERSION/[^)]*" "$RUNNER_TEMP/notes.md" | sed 's|.*/||' | sort -u); do
+            if [ -f "dist/$f" ]; then echo "ok  $f"; else echo "::error::the release notes link to $f, which was not built"; missing=1; fi
+          done
+          exit $missing
       - uses: softprops/action-gh-release@v2
+        if: needs.prepare.outputs.publish == 'true'
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           name: EventKit ${{ needs.prepare.outputs.version }}
