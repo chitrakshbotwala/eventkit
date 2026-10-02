@@ -178,15 +178,16 @@ Everything that changes state is written to the audit log.
 
 ```
  main ──(CI passes)──► scripts/split-branches.mjs ──► server  ──git pull──► VPS (systemd + Caddy)
-                                                  └──► desktop ──tag v*──► GitHub Actions ──► signed installers
-                                                                                   │
-                                     copy release files to <server>/updates/ ◄──────┘
-                                     apps auto-update from there (never during the offline phase)
+                                                  └──► desktop (the app's source on its own)
+ main ──Actions → "Release desktop app"──► build, install and launch every installer
+                                         └──► GitHub Release ──► attendees download it
+                                                             └──► installed apps auto-update
+                                                                  (never during the offline phase)
 ```
 
 - **Server.** Clone the `server` branch on the VPS. Run `deploy/update.sh`, then restart the service. Caddy provides the HTTPS certificate. SQLite stores everything in `/var/lib/eventkit`, and `deploy/backup.sh` snapshots it.
-- **Desktop.** Tag `v0.2.0` on the `desktop` branch. GitHub Actions builds Windows, macOS and Linux installers, signs them if certificates are configured, and drafts a release. The installers have the server URL and manifest public key built in.
-- **Updates.** Copy a release's files into the server's `updates/` folder. Running apps pick them up and install on next quit.
+- **Desktop.** Run the "Release desktop app" workflow with a version. It builds the Windows installer, the Mac disk images and the Linux AppImage, deb, rpm and pacman packages, installs and launches each one (Linux under both Wayland and X11), and publishes a GitHub Release. The installers have the server URL and manifest public key built in.
+- **Updates.** Installed apps check the GitHub Releases and install a newer version on next quit.
 
 ## What it can and can't prove
 
