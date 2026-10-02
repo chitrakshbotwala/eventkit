@@ -71,6 +71,8 @@ export function evaluateReadiness(
   const doctor = evaluateDoctor(report.doctor, {
     androidRequired: Boolean(android?.enabled),
     vscodeVerifiedLocally: vscodeVerified,
+    // The Android component only verifies once the SDK license file is present.
+    androidLicensesVerifiedLocally: byId.get('android')?.status === 'verified',
   });
   for (const f of doctor.failures) reasons.push(`flutter doctor: ${f}`);
   warnings.push(...doctor.warnings);

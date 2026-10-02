@@ -4,6 +4,8 @@ import {
   parseFlutterDoctor,
   type ComponentOf,
 } from '@eventkit/shared';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ComponentContext, ComponentRunner } from '../types';
 import { COMPONENT_WEIGHTS, dependsOnFor } from './meta';
 import { flutter, hasFlutter } from './util';
@@ -19,6 +21,9 @@ export async function runDoctor(ctx: ComponentContext) {
   const evaluation = evaluateDoctor(summary, {
     androidRequired: Boolean(findComponent(ctx.manifest, 'android')?.enabled),
     vscodeVerifiedLocally: vscodeVerified,
+    androidLicensesVerifiedLocally: existsSync(
+      join(ctx.dirs.androidSdk, 'licenses', 'android-sdk-license'),
+    ),
   });
   ctx.facts.doctorOutput = output;
   ctx.facts.doctor = summary;
