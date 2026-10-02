@@ -308,16 +308,18 @@ For local development you can add `http://localhost:8080/auth/google/callback` a
 
 Attendees download EventKit from this repository's GitHub Releases. Give them `https://github.com/<owner>/<repo>/releases/latest`: it always shows the newest release, with a download table per operating system and install instructions.
 
-**To release:** GitHub → Actions → **Release desktop app** → Run workflow on `main`, with a version such as `0.2.0`. The workflow:
+**To release:** GitHub → Actions → **Release desktop app** → **Run workflow** (branch `main`). Leave the version empty to release the version in `apps/desktop/package.json`, or enter a new one such as `0.2.0`. The workflow:
 
-1. bumps `apps/desktop/package.json` on `main` and tags `v0.2.0`;
+1. sets `apps/desktop/package.json` to the new version on `main`, if you entered one;
 2. builds every installer, with the server URL and manifest key from the repository variables `EVENTKIT_SERVER_URL` and `EVENTKIT_MANIFEST_PUBKEYS` built in;
-3. installs and launches each one (see launch tests below). Any failure stops the release;
-4. publishes the release with the download notes from `.github/release-notes.md` and `SHA256SUMS.txt`.
+3. installs and launches each one (see launch tests below). Any failure stops the release, and nothing is tagged;
+4. publishes the release, tagged `v<version>`, with the download notes from `.github/release-notes.md` and `SHA256SUMS.txt`.
+
+A version can be released once. To ship a fix, run it again with the next version (`0.1.1`).
 
 Other ways to run it:
 
-- **No version:** a test build. Everything is built and launch-tested and the installers are attached to the run as artifacts, but nothing is published.
+- **Tick "Test build only":** everything is built and launch-tested and the installers are attached to the run as artifacts, but nothing is published.
 - **Push a tag** `vX.Y.Z` that matches `apps/desktop/package.json`: releases that commit.
 - **A version with a suffix**, such as `0.3.0-rc.1`: a pre-release. It is not marked "Latest" and installed apps don't update to it, so use it to try a build before attendees get it.
 
