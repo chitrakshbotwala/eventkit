@@ -1,3 +1,4 @@
+import './smoke-profile';
 import { app, clipboard, dialog, net, Notification, powerMonitor, session, shell } from 'electron';
 import { z } from 'zod';
 import type { AppInfo, Phase2View, QrView } from '../common/ipc';
@@ -23,6 +24,7 @@ import { simulatedDownloader, simulatedRunners } from './setup/simulate';
 import { setAutoLaunch } from './autolaunch';
 import { Phase2Controller } from './phase2/controller';
 import { createTray, setTrayStatus } from './tray';
+import { runSmokeTest } from './smoke';
 import { startAutoUpdate } from './updater';
 import { createMainWindow, getMainWindow, hardenApp } from './window';
 import { homedir } from 'node:os';
@@ -317,7 +319,8 @@ app
   .then(async () => {
     hardenApp();
     registerIpc();
-    createMainWindow({ show: !config.startHidden });
+    const win = createMainWindow({ show: !config.startHidden });
+    if (config.smokeTestResult) runSmokeTest(win, config.smokeTestResult);
     createTray({
       show: () => (getMainWindow() ?? createMainWindow({ show: true })).show(),
       quit: () => void requestQuit(),

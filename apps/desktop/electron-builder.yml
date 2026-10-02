@@ -73,20 +73,34 @@ dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
   writeUpdateInfo: false
 
+# One x64 build runs on both Wayland (natively) and X11: Electron picks the display
+# server at startup. Release CI launches it under each, and installs every package on
+# its distro.
 linux:
   target:
-    - target: AppImage
+    - target: AppImage # any distro; the only Linux format that auto-updates
       arch: [x64]
-    - target: deb
+    - target: deb # Debian, Ubuntu, Mint, Pop!_OS
+      arch: [x64]
+    - target: rpm # Fedora, RHEL, openSUSE
+      arch: [x64]
+    - target: pacman # Arch, Manjaro, EndeavourOS
       arch: [x64]
   icon: build/icon.png
   category: Development
+  # Matches package.json "desktopName": the Wayland app_id and X11 WM_CLASS that tie the
+  # window to eventkit.desktop (its icon and name in docks and task switchers).
+  executableName: eventkit
+  desktop:
+    entry:
+      StartupWMClass: eventkit
   synopsis: Flutter workshop setup, attendance QR and offline-phase monitor
   maintainer: Event organizers <organizers@example.org>
   artifactName: ${productName}-${version}-${arch}.${ext}
 
+# Runtime libraries of Electron itself; distro package managers install them.
+# pkexec (polkit) is used once during setup to install system packages.
 deb:
-  # pkexec (policykit-1) is used once during setup to install system packages.
   depends:
     [
       libgtk-3-0,
@@ -98,8 +112,44 @@ deb:
       libatspi2.0-0,
       libuuid1,
       libsecret-1-0,
+      libgbm1,
+      libasound2t64 | libasound2,
     ]
   recommends: ['pkexec | policykit-1']
+
+rpm:
+  depends:
+    [
+      gtk3,
+      libnotify,
+      nss,
+      libXScrnSaver,
+      libXtst,
+      xdg-utils,
+      at-spi2-core,
+      libuuid,
+      libsecret,
+      mesa-libgbm,
+      alsa-lib,
+    ]
+
+pacman:
+  depends:
+    [
+      gtk3,
+      libnotify,
+      nss,
+      libxss,
+      libxtst,
+      xdg-utils,
+      at-spi2-core,
+      util-linux-libs,
+      libsecret,
+      mesa,
+      alsa-lib,
+    ]
+  # pacman -U wants a .pkg.tar.* name; fpm compresses with xz.
+  artifactName: ${productName}-${version}-${arch}.pkg.tar.xz
 
 # Required so electron-builder writes app-update.yml and latest*.yml. The app overrides
 # the URL at runtime with <server>/updates/ (see src/main/updater.ts), so this

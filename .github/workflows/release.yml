@@ -1,11 +1,21 @@
 name: Release desktop app
 
-# Push a tag like v0.2.0 (matching apps/desktop/package.json "version") to build signed
-# installers for all three platforms and attach them to a draft GitHub release.
+# Builds every installer, installs and launches each one, and publishes them as a GitHub
+# Release that attendees download from (README → "Releasing the desktop app").
+#
+#   Actions → "Release desktop app" → Run workflow, version 0.2.0
+#       bumps apps/desktop/package.json on main, tags v0.2.0, builds, tests, publishes.
+#   Run workflow with no version
+#       test build: everything is built and launch-tested, nothing is published.
+#   git push origin v0.2.0
+#       same as the button, for a tag you made yourself (must match package.json).
+#
+# A version with a suffix (0.3.0-rc.1) becomes a pre-release: installed apps never
+# auto-update to it, and it is not shown as "Latest".
 #
 # Repository variables (Settings → Secrets and variables → Actions → Variables):
 #   EVENTKIT_SERVER_URL        https://event.example.org   (baked into the app; must be https)
-#   EVENTKIT_MANIFEST_PUBKEYS  base64 Ed25519 public key(s), comma-separated (pnpm keys:gen)
+#   EVENTKIT_MANIFEST_PUBKEYS  base64 Ed25519 public key(s), comma-separated
 # Optional secrets (installers are unsigned without them; see README "Code signing"):
 #   WIN_CSC_LINK, WIN_CSC_KEY_PASSWORD                      Windows Authenticode (.pfx, base64)
 #   MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD                      Developer ID Application (.p12, base64)
@@ -15,47 +25,132 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.2.0. Leave empty for a test build (nothing is published).'
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: win
-          - os: macos-latest
-            target: mac
-          - os: ubuntu-latest
-            target: linux
-    runs-on: ${{ matrix.os }}
-    env:
-      MAIN_VITE_API_BASE_URL: ${{ vars.EVENTKIT_SERVER_URL }}
-      MAIN_VITE_MANIFEST_PUBKEYS: ${{ vars.EVENTKIT_MANIFEST_PUBKEYS }}
+  prepare:
+    name: Prepare version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      ref: ${{ steps.version.outputs.ref }}
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Check build configuration
         shell: bash
+        env:
+          SERVER_URL: ${{ vars.EVENTKIT_SERVER_URL }}
+          PUBKEYS: ${{ vars.EVENTKIT_MANIFEST_PUBKEYS }}
         run: |
-          case "$MAIN_VITE_API_BASE_URL" in
+          case "$SERVER_URL" in
             https://*) ;;
             *) echo "::error::Set the EVENTKIT_SERVER_URL repository variable to an https:// URL"; exit 1 ;;
           esac
-          if [ -z "$MAIN_VITE_MANIFEST_PUBKEYS" ]; then
-            echo "::error::Set the EVENTKIT_MANIFEST_PUBKEYS repository variable (pnpm keys:gen)"; exit 1
-          fi
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            version=$(node -p "require('./apps/desktop/package.json').version")
-            if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
-              echo "::error::Tag ${GITHUB_REF_NAME} does not match apps/desktop version $version"; exit 1
-            fi
+          if [ -z "$PUBKEYS" ]; then
+            echo "::error::Set the EVENTKIT_MANIFEST_PUBKEYS repository variable (the server's public key)"; exit 1
           fi
 
+      - name: Resolve version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          current=$(node -p "require('./apps/desktop/package.json').version")
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            version=${GITHUB_REF_NAME#v}
+            if [ "$version" != "$current" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match apps/desktop/package.json version $current"; exit 1
+            fi
+            ref=$GITHUB_REF_NAME
+            publish=true
+          elif [ -n "$INPUT_VERSION" ]; then
+            version=${INPUT_VERSION#v}
+            if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::'$INPUT_VERSION' is not a version like 0.2.0 or 0.3.0-rc.1"; exit 1
+            fi
+            if [ "$GITHUB_REF_NAME" != main ]; then
+              echo "::error::Run releases from main (this run is on $GITHUB_REF_NAME)"; exit 1
+            fi
+            if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+              echo "::error::v$version already exists. Pick a new version."; exit 1
+            fi
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            if [ "$version" != "$current" ]; then
+              node -e "
+                const fs = require('fs');
+                const p = 'apps/desktop/package.json';
+                const j = JSON.parse(fs.readFileSync(p, 'utf8'));
+                j.version = process.argv[1];
+                fs.writeFileSync(p, JSON.stringify(j, null, 2) + '\n');
+              " "$version"
+              git commit -qm "release: v$version" apps/desktop/package.json
+              git push origin HEAD:main
+            fi
+            git tag -a "v$version" -m "EventKit $version"
+            git push origin "v$version"
+            ref=v$version
+            publish=true
+          else
+            version=$current
+            ref=$GITHUB_SHA
+            publish=false
+          fi
+          prerelease=false
+          [[ "$version" == *-* ]] && prerelease=true
+          {
+            echo "ref=$ref"
+            echo "version=$version"
+            echo "publish=$publish"
+            echo "prerelease=$prerelease"
+          } >> "$GITHUB_OUTPUT"
+          echo "### EventKit $version (publish: $publish, pre-release: $prerelease)" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: win
+          - name: macOS
+            os: macos-latest
+            target: mac
+          - name: Linux
+            os: ubuntu-24.04
+            target: linux
+    runs-on: ${{ matrix.os }}
+    env:
+      MAIN_VITE_API_BASE_URL: ${{ vars.EVENTKIT_SERVER_URL }}
+      MAIN_VITE_MANIFEST_PUBKEYS: ${{ vars.EVENTKIT_MANIFEST_PUBKEYS }}
+      # Installed apps auto-update from this repository's GitHub Releases.
+      MAIN_VITE_UPDATE_REPO: ${{ github.repository }}
+      MAIN_VITE_MAC_SIGNED: ${{ secrets.MAC_CSC_LINK != '' && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -63,6 +158,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @eventkit/desktop test
+
+      - name: Install rpm and pacman packaging tools
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm libarchive-tools
 
       - name: Build installers
         shell: bash
@@ -76,7 +175,65 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: pnpm --filter @eventkit/desktop dist:${{ matrix.target }}
+        run: |
+          pnpm --filter @eventkit/desktop dist:${{ matrix.target }}
+          ls -la apps/desktop/release
+
+      # ---- launch tests: the installed app must open its window and talk to its preload ----
+
+      - name: Launch test (Windows installer)
+        if: matrix.target == 'win'
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem apps/desktop/release/*.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter EventKit.exe | Select-Object -First 1
+          if (-not $exe) { throw 'EventKit.exe not found after a silent install' }
+          Write-Host "installed at $($exe.FullName)"
+          $result = Join-Path $env:RUNNER_TEMP 'smoke.json'
+          $env:EVENTKIT_SMOKE_TEST = $result
+          $env:EVENTKIT_DISABLE_UPDATES = '1'
+          $p = Start-Process $exe.FullName -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); Write-Host 'timed out' }
+          if (Test-Path $result) { Get-Content $result } else { Write-Host '(no result written)' }
+          if ($p.ExitCode -ne 0 -or -not (Select-String -Path $result -Pattern '"ok": true' -Quiet)) { exit 1 }
+
+      - name: Launch test (macOS disk image)
+        if: matrix.target == 'mac'
+        shell: bash
+        run: |
+          dmg=$(ls apps/desktop/release/*-arm64.dmg)
+          mnt="$RUNNER_TEMP/eventkit-dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mnt" "$dmg"
+          trap 'hdiutil detach "$mnt" || true' EXIT
+          scripts/smoke-test.sh "$mnt/EventKit.app/Contents/MacOS/EventKit"
+
+      - name: Launch test (Linux AppImage on X11 and on Wayland)
+        if: matrix.target == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends xvfb weston dbus-daemon
+          # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's sandbox uses.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          appimage=$(ls apps/desktop/release/*.AppImage)
+          chmod +x "$appimage"
+
+          echo "::group::X11 (Xvfb)"
+          Xvfb :99 -screen 0 1280x800x24 &
+          sleep 2
+          DISPLAY=:99 dbus-run-session -- scripts/smoke-test.sh "$appimage"
+          echo "::endgroup::"
+
+          echo "::group::Wayland (headless Weston)"
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"
+          mkdir -p -m 700 "$XDG_RUNTIME_DIR"
+          weston --backend=headless --socket=wayland-ek --idle-time=0 &
+          sleep 3
+          env -u DISPLAY WAYLAND_DISPLAY=wayland-ek dbus-run-session -- \
+            scripts/smoke-test.sh "$appimage" --ozone-platform=wayland
+          echo "::endgroup::"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -88,29 +245,91 @@ jobs:
             apps/desktop/release/*.zip
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
+            apps/desktop/release/*.rpm
+            apps/desktop/release/*.pkg.tar.xz
             apps/desktop/release/*.blockmap
             apps/desktop/release/latest*.yml
 
+  # Install each Linux package with its distro's package manager (which pulls in the
+  # declared dependencies on a minimal system) and launch the installed app.
+  linux-packages:
+    name: Install on ${{ matrix.distro }}
+    needs: [prepare, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Ubuntu 24.04 (.deb)
+            image: ubuntu:24.04
+            install: |
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y ./pkg/*.deb xvfb dbus
+          - distro: Debian 12 (.deb)
+            image: debian:12
+            install: |
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y ./pkg/*.deb xvfb dbus
+          - distro: Fedora (.rpm)
+            image: fedora:latest
+            install: dnf install -y ./pkg/*.rpm xorg-x11-server-Xvfb dbus-daemon
+          - distro: Arch Linux (pacman)
+            image: archlinux:latest
+            install: |
+              pacman -Syu --noconfirm xorg-server-xvfb dbus
+              pacman -U --noconfirm ./pkg/*.pkg.tar.xz
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventkit-linux
+          path: pkg
+      - name: Install
+        shell: bash
+        run: ${{ matrix.install }}
+      - name: Launch test
+        shell: bash
+        run: |
+          exe=$(command -v eventkit || ls /opt/*/eventkit)
+          echo "installed at $exe"
+          Xvfb :99 -screen 0 1280x800x24 &
+          sleep 2
+          bus=(); command -v dbus-run-session >/dev/null && bus=(dbus-run-session --)
+          # Containers run as root without the kernel features Chromium's sandbox needs.
+          DISPLAY=:99 "${bus[@]}" bash scripts/smoke-test.sh "$exe" --no-sandbox
+
   release:
-    name: Draft GitHub release
-    needs: build
-    if: github.ref_type == 'tag'
+    name: Publish GitHub Release
+    needs: [prepare, build, linux-packages]
+    if: needs.prepare.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
-      - name: Checksums
-        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Checksums and release notes
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          sed -e "s|{{VERSION}}|$VERSION|g" -e "s|{{REPO}}|$GITHUB_REPOSITORY|g" \
+            .github/release-notes.md > "$RUNNER_TEMP/notes.md"
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: EventKit ${{ needs.prepare.outputs.version }}
+          body_path: ${{ runner.temp }}/notes.md
+          generate_release_notes: true
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.prepare.outputs.prerelease == 'true' && 'false' || 'true' }}
           files: dist/*
-          body: |
-            Desktop installers for attendees.
-
-            To enable auto-update, copy every file from this release (including the
-            `latest*.yml` files) into `<DATA_DIR>/updates/` on the event server.

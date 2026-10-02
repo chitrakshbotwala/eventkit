@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "One-click Flutter toolchain setup, attendance QR and offline-phase monitor",
+  "desktopName": "eventkit.desktop",
   "author": "Event organizers",
   "main": "./out/main/index.js",
   "scripts": {

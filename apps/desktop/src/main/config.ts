@@ -46,6 +46,10 @@ export const config = {
   /** Speed multiplier for simulated work (higher = faster). */
   simulateSpeed: Number(argValue('simulate-speed') ?? '1') || 1,
   startHidden: process.argv.includes('--hidden'),
+  /** Release CI: load the window, check IPC, write the result to this file and quit. */
+  smokeTestResult: process.env['EVENTKIT_SMOKE_TEST'] || null,
+  /** "owner/repo" whose GitHub Releases feed auto-update; otherwise <server>/updates/. */
+  updateRepo: import.meta.env.MAIN_VITE_UPDATE_REPO || null,
 };
 
 export const paths = {
