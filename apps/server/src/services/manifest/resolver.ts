@@ -70,12 +70,20 @@ interface AdoptiumAsset {
   version: { semver: string; openjdk_version: string };
 }
 
-export async function fetchTemurin(os: Platform, arch: Arch): Promise<ResolvedArtifact> {
+async function temurinAssets(os: Platform, arch: Arch): Promise<AdoptiumAsset[]> {
   const aos = os === 'macos' ? 'mac' : os;
   const aarch = arch === 'arm64' ? 'aarch64' : 'x64';
   const url = `https://api.adoptium.net/v3/assets/latest/17/hotspot?architecture=${aarch}&image_type=jdk&os=${aos}&vendor=eclipse`;
-  const list = (await getJson(url)) as AdoptiumAsset[];
-  const a = list[0];
+  return (await getJson(url)) as AdoptiumAsset[];
+}
+
+/**
+ * Temurin JDK 17 for an OS/arch. There is no Windows arm64 build of 17, so Windows on
+ * ARM gets the x64 JDK, which runs under emulation (same as Flutter there).
+ */
+export async function fetchTemurin(os: Platform, arch: Arch): Promise<ResolvedArtifact> {
+  let a = (await temurinAssets(os, arch))[0];
+  if (!a && os === 'windows' && arch === 'arm64') a = (await temurinAssets(os, 'x64'))[0];
   if (!a) throw new Error(`no Temurin 17 for ${os}/${arch}`);
   const p = a.binary.package;
   return {
@@ -275,9 +283,7 @@ export const upstreamResolver: ManifestResolver = {
       return r;
     };
 
-    const targets: Record<string, ResolvedTarget> = {};
-    for (const { os, arch } of SUPPORTED_TARGETS) {
-      log(`target ${os}/${arch}`);
+    const resolveTarget = async (os: Platform, arch: Arch): Promise<ResolvedTarget> => {
       const java = await fetchTemurin(os, arch);
       const vscode = await fetchVsCode(os, arch);
       const cl = cmdline[os];
@@ -313,8 +319,27 @@ export const upstreamResolver: ManifestResolver = {
         await mirrorHash('java', java, java.sha256);
         await mirrorHash('vscode', vscode, vscode.sha256);
       }
-      targets[targetKey(os, arch)] = t;
+      return t;
+    };
+
+    // One platform failing (an upstream outage, a build that doesn't exist) must not block
+    // the others. Its attendees see "not published yet" until a later resolve succeeds.
+    const targets: Record<string, ResolvedTarget> = {};
+    const failed: string[] = [];
+    for (const { os, arch } of SUPPORTED_TARGETS) {
+      log(`target ${os}/${arch}`);
+      try {
+        targets[targetKey(os, arch)] = await resolveTarget(os, arch);
+      } catch (err) {
+        const msg = `${os}/${arch}: ${err instanceof Error ? err.message : String(err)}`;
+        log(`skipped ${msg}`);
+        failed.push(msg);
+      }
     }
+    if (failed.length === SUPPORTED_TARGETS.length) {
+      throw new Error(`no platform resolved (${failed.join('; ')})`);
+    }
+    for (const f of failed) warnings.push(`not published for ${f}`);
 
     let android: ResolvedSet['android'];
     const current = flutterReleases.linux?.releases.find(
