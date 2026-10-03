@@ -45,6 +45,8 @@ export interface Facts {
   devtoolsVersion?: string;
   /** Toolchains the attendee already had, used instead of the managed copies. */
   adopted?: AdoptedDirs;
+  /** The Android SDK whose licenses setup has accepted (all of them, as flutter doctor wants). */
+  licensesAcceptedFor?: string;
   /** Simulate mode: components "installed" so far, with versions. */
   simulated?: Partial<Record<ComponentId, string>>;
 }
