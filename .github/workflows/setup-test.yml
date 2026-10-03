@@ -1,0 +1,160 @@
+name: Real setup test
+
+# Runs the desktop app's real setup on fresh machines against the live manifest: it
+# downloads and installs Flutter, Java, the Android SDK, Chrome and VS Code, runs
+# flutter doctor and the offline warm-up build, and checks the result with the same
+# readiness rules the server applies. Sign-in is not needed (see setup-test.ts).
+#
+# This is the automated version of the runbook's "run a real setup on a fresh machine
+# for each OS". Run it after changing the manifest settings or the setup code, and
+# before attendees start setting up. Each OS takes 20-60 minutes.
+#
+# Runner images come with an Android SDK and JDK; their variables are hidden from the
+# app so it installs the SDK fresh, as on most attendee laptops.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # Mondays: catches upstream changes (new Flutter, Android tools)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: setup-test
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: Setup on ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: win
+            unpacked: win-unpacked
+          - name: macOS
+            os: macos-latest
+            target: mac
+            unpacked: mac-arm64
+          - name: Ubuntu 24.04
+            os: ubuntu-24.04
+            target: linux
+            unpacked: linux-unpacked
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      MAIN_VITE_API_BASE_URL: ${{ vars.EVENTKIT_SERVER_URL }}
+      MAIN_VITE_MANIFEST_PUBKEYS: ${{ vars.EVENTKIT_MANIFEST_PUBKEYS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the app (unpacked)
+        shell: bash
+        run: |
+          cd apps/desktop
+          pnpm exec electron-vite build
+          pnpm exec electron-builder --config electron-builder.yml --${{ matrix.target }} --dir --publish never
+          ls release
+
+      - name: Linux system packages (setup asks for them through pkexec, which CI can't answer)
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb dbus-daemon \
+            curl git unzip xz-utils zip libglu1-mesa clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Run the real setup
+        shell: bash
+        run: |
+          case "${{ matrix.target }}" in
+            win) exe="apps/desktop/release/win-unpacked/EventKit.exe" ;;
+            mac) exe="apps/desktop/release/mac-arm64/EventKit.app/Contents/MacOS/EventKit" ;;
+            linux) exe="apps/desktop/release/linux-unpacked/eventkit" ;;
+          esac
+          result="$RUNNER_TEMP/setup-result.json"
+          echo "result=$result" >> "$GITHUB_ENV"
+          # Hide the runner's own Android SDK and JDK: attendees mostly have neither.
+          unset ANDROID_HOME ANDROID_SDK_ROOT ANDROID_NDK_HOME JAVA_HOME
+          export EVENTKIT_SETUP_TEST="$result" EVENTKIT_DISABLE_UPDATES=1
+          if [ "${{ matrix.target }}" = linux ]; then
+            Xvfb :99 -screen 0 1280x800x24 &
+            sleep 2
+            DISPLAY=:99 dbus-run-session -- "$exe" || true
+          else
+            "$exe" || true
+          fi
+          test -s "$result"
+
+      - name: Report
+        if: always()
+        shell: bash
+        run: node scripts/setup-test-report.mjs "$result" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: setup-result-${{ matrix.target }}
+          path: ${{ runner.temp }}/setup-result.json
+          if-no-files-found: ignore
+
+      - name: Pass or fail
+        shell: bash
+        run: |
+          node -e "process.exit(require(process.argv[1]).ok ? 0 : 1)" "$result"
+
+  # Arch (Omarchy, Manjaro, EndeavourOS): the Ubuntu build, run as a normal user in an
+  # Arch container with the packages setup would install through pacman.
+  arch:
+    name: Setup on Arch Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container: archlinux:latest
+    env:
+      MAIN_VITE_API_BASE_URL: ${{ vars.EVENTKIT_SERVER_URL }}
+      MAIN_VITE_MANIFEST_PUBKEYS: ${{ vars.EVENTKIT_MANIFEST_PUBKEYS }}
+    steps:
+      - name: Packages
+        run: |
+          pacman -Syu --noconfirm --needed nodejs pnpm git base-devel xorg-server-xvfb dbus \
+            curl unzip xz zip glu clang cmake ninja pkgconf gtk3 chromium \
+            nss alsa-lib libxss libxtst at-spi2-core libsecret mesa libnotify which
+      - uses: actions/checkout@v4
+      - name: Build the app (unpacked)
+        run: |
+          pnpm install --frozen-lockfile
+          cd apps/desktop
+          pnpm exec electron-vite build
+          pnpm exec electron-builder --config electron-builder.yml --linux dir --publish never
+      - name: Run the real setup as a normal user
+        run: |
+          useradd -m tester
+          cp -r apps/desktop/release/linux-unpacked /home/tester/app
+          chown -R tester /home/tester/app
+          Xvfb :99 -screen 0 1280x800x24 &
+          sleep 2
+          # Containers lack the kernel features Chromium's sandbox needs.
+          su tester -c 'cd ~ && DISPLAY=:99 EVENTKIT_SETUP_TEST=/home/tester/setup-result.json \
+            EVENTKIT_DISABLE_UPDATES=1 dbus-run-session -- ./app/eventkit --no-sandbox' || true
+          cp /home/tester/setup-result.json "$RUNNER_TEMP/setup-result.json"
+      - name: Report
+        if: always()
+        run: node scripts/setup-test-report.mjs "$RUNNER_TEMP/setup-result.json" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: setup-result-arch
+          path: ${{ runner.temp }}/setup-result.json
+          if-no-files-found: ignore
+      - name: Pass or fail
+        run: |
+          node -e "process.exit(require(process.argv[1]).ok ? 0 : 1)" "$RUNNER_TEMP/setup-result.json"

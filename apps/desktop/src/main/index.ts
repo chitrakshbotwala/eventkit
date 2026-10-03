@@ -24,6 +24,7 @@ import { simulatedDownloader, simulatedRunners } from './setup/simulate';
 import { setAutoLaunch } from './autolaunch';
 import { Phase2Controller } from './phase2/controller';
 import { createTray, setTrayStatus } from './tray';
+import { runSetupTest } from './setup-test';
 import { runSmokeTest } from './smoke';
 import { startAutoUpdate } from './updater';
 import { createMainWindow, getMainWindow, hardenApp } from './window';
@@ -322,6 +323,7 @@ app
     registerIpc();
     const win = createMainWindow({ show: !config.startHidden });
     if (config.smokeTestResult) runSmokeTest(win, config.smokeTestResult);
+    if (config.setupTestResult) void runSetupTest(engine, config.setupTestResult);
     createTray({
       show: () => (getMainWindow() ?? createMainWindow({ show: true })).show(),
       quit: () => void requestQuit(),
