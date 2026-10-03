@@ -172,7 +172,7 @@ Attendees install and set up EventKit **at home, before the event**, and arrive 
    - keep **Gradle warm-up** on (the default) if attendees will build Android APKs. It fetches Gradle, the Android build dependencies and the NDK at home, so APK builds at the venue need no internet.
 3. Settings → Manifest: upload the starter project zip, then **Refresh manifest**. It must show "signed, resolved", not "placeholder".
 4. Publish the desktop app: Actions → **Release desktop app** → Run workflow with a version (see [Releasing the desktop app](#releasing-the-desktop-app)). Put `https://github.com/<owner>/<repo>/releases/latest` on the event page.
-5. **Run a real setup on a fresh VM or laptop for each OS** (Windows 11, macOS on Apple Silicon, Ubuntu LTS, and any other Linux your attendees use), on a normal home connection. It must reach "Ready". Note how long it takes and how much it downloads (several GB), and put both in the attendee email. Simulate mode does not exercise the real installers.
+5. **Run a real setup for each OS.** Actions → **Real setup test** → Run workflow runs the full setup on fresh Windows, macOS, Ubuntu and Arch machines against the live manifest and reports, per OS, every component and whether the server would accept the result. It also runs every Monday, to catch upstream changes. Then do one run on a real laptop on a normal home connection: it must reach "Ready". Note how long it takes and how much it downloads (several GB), and put both in the attendee email. Simulate mode does not exercise the real installers.
 6. Import the RSVP CSV (Attendees → Import). Any export with an email column works, plus optionally a name column or first/last name columns.
 7. Create volunteer accounts (Settings → Admin users) and turn on 2FA for every superadmin.
 
@@ -393,4 +393,4 @@ Unsigned builds work, but attendees will see scary warnings. Sign anything you h
   - desktop: OAuth loopback listener, resumable downloader, setup engine state machine, env and PATH persistence, Windows quoting, network probes, local log.
 - `windows.test.ts` only runs on Windows. CI covers it.
 - Use `pnpm dev:simulate` with `--simulate-fail` and `--simulate-flaky` for end-to-end UI flows.
-- Before an event, do the fresh-VM runs from the runbook. They are the only test of the real installers against real upstreams.
+- The **Real setup test** workflow runs the real installers against real upstreams on fresh Windows, macOS, Ubuntu and Arch machines (`EVENTKIT_SETUP_TEST=<file>` makes a packaged build run setup without sign-in, check it with the readiness rules and write a report). Run it before an event and after changing the toolchain settings.
