@@ -83,7 +83,11 @@ async function acceptLicenses(ctx: ComponentContext) {
         onLine: (l) => ctx.log.debug(`  licenses: ${l}`),
       },
     );
-    if (res?.code === 0 && licensesAccepted(ctx)) return;
+    if (res?.code === 0 && licensesAccepted(ctx)) {
+      ctx.facts.licensesAcceptedFor = ctx.dirs.androidSdk;
+      ctx.save();
+      return;
+    }
     ctx.log.warn(
       'flutter doctor --android-licenses did not complete; falling back to sdkmanager --licenses',
     );
@@ -92,6 +96,8 @@ async function acceptLicenses(ctx: ComponentContext) {
     respond,
     timeoutMs: 10 * 60_000,
   });
+  ctx.facts.licensesAcceptedFor = ctx.dirs.androidSdk;
+  ctx.save();
 }
 
 export const androidRunner: ComponentRunner<ComponentOf<'android'>> = {
@@ -108,7 +114,15 @@ export const androidRunner: ComponentRunner<ComponentOf<'android'>> = {
     const installed = await installedPackages(ctx);
     if (!installed) return { installed: false };
     const missing = c.packages.filter((p) => !installed.has(p));
-    return { installed: missing.length === 0 && licensesAccepted(ctx), detail: missing.join(' ') };
+    // An existing SDK (Android Studio's) often has only some licenses accepted, which
+    // flutter doctor reports as a failure: accept them all once, as setup does for its own.
+    const licensesDone =
+      licensesAccepted(ctx) &&
+      (!c.acceptLicenses || ctx.facts.licensesAcceptedFor === ctx.dirs.androidSdk);
+    return {
+      installed: missing.length === 0 && licensesDone,
+      detail: [...missing, ...(licensesDone ? [] : ['licenses'])].join(' '),
+    };
   },
   async install(c, ctx) {
     configureEnv(ctx);
