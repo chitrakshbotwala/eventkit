@@ -53,6 +53,11 @@ const api: EventKitApi = {
     recent: () => call(CHANNELS.logsRecent),
     openFolder: () => call(CHANNELS.logsOpenFolder),
   },
+  updates: {
+    state: () => call(CHANNELS.updateState),
+    check: () => call(CHANNELS.updateCheck),
+    install: () => call(CHANNELS.updateInstall),
+  },
   on(event, cb) {
     if (!EVENT_NAMES.includes(event)) throw new Error(`unknown event ${String(event)}`);
     const listener = (_e: IpcRendererEvent, payload: EventMap[typeof event]) => cb(payload);

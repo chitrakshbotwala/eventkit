@@ -328,9 +328,9 @@ Other ways to run it:
 | `EventKit-Setup-<v>-x64.exe`     | Windows 10 and 11 (Windows on Arm runs it emulated) | yes                         |
 | `EventKit-<v>-arm64.dmg`         | Macs with Apple silicon                             | only if Developer ID signed |
 | `EventKit-<v>-x64.dmg`           | Intel Macs                                          | only if Developer ID signed |
-| `EventKit-<v>-amd64.deb`         | Debian, Ubuntu, Mint, Pop!\_OS                      | no: install the new version |
-| `EventKit-<v>-x86_64.rpm`        | Fedora, RHEL, openSUSE                              | no: install the new version |
-| `EventKit-<v>-x86_64.pkg.tar.xz` | Arch, Manjaro, EndeavourOS (`pacman -U`)            | no: install the new version |
+| `EventKit-<v>-amd64.deb`         | Debian, Ubuntu, Mint, Pop!\_OS                      | yes (asks for the password) |
+| `EventKit-<v>-x86_64.rpm`        | Fedora, RHEL, openSUSE                              | yes (asks for the password) |
+| `EventKit-<v>-x86_64.pkg.tar.xz` | Arch, Manjaro, EndeavourOS (`pacman -U`)            | yes (asks for the password) |
 | `EventKit-<v>-x86_64.AppImage`   | any other Linux                                     | yes                         |
 
 The `.zip`, `.blockmap` and `latest*.yml` files in a release are for auto-update.
@@ -348,9 +348,11 @@ The `.zip`, `.blockmap` and `latest*.yml` files in a release are for auto-update
 
 **Auto-update** (electron-updater):
 
-- Installed apps check this repository's releases 30 s after start and then every 4 hours, never during the offline phase. Updates download in the background, are verified against the sha512 in `latest*.yml`, and install on the next quit.
+- Installed apps check this repository's releases 30 s after start and then every 4 hours, never during the offline phase. A newer version downloads in the background and is verified against the sha512 in `latest*.yml`.
+- Once it has downloaded, a bar at the top of every screen (the sign-in screen too) says **EventKit x.y.z is ready to install** with a **Restart to update** button, and a notification says the same. It also installs by itself the next time EventKit quits. Settings → About shows the update status and has **Check for updates**.
+- The Windows installer, the AppImage and the `.deb`, `.rpm` and pacman packages all update this way. The Linux packages ask for the administrator password (pkexec) to install.
+- macOS installs only updates signed with the same Developer ID, so unsigned Mac builds show **Download** instead, which opens the release page.
 - Publishing a release therefore updates every attendee's app. Publish the final version **before** attendees start setting up (see the runbook).
-- macOS installs only updates signed with the same Developer ID, so unsigned Mac builds don't auto-update. The `.deb`, `.rpm` and pacman packages update when the attendee installs the new version.
 - A build made outside the release workflow (without `MAIN_VITE_UPDATE_REPO`) checks `<server>/updates/` instead. Copy a release's files, including `latest*.yml`, into `DATA_DIR/updates/` to serve them there.
 
 **Local builds:**

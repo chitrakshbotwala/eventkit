@@ -23,7 +23,7 @@ Not sure which Mac you have? Apple menu â†’ **About This Mac**: "Chip: Apple Mâ€
 - **Arch:** `sudo pacman -U EventKit-{{VERSION}}-x86_64.pkg.tar.xz`
 - **AppImage:** `chmod +x EventKit-{{VERSION}}-x86_64.AppImage`, then run it. If it says "AppImages require FUSE", install FUSE 2 (`libfuse2` on most distros, `fuse2` on Arch). On Ubuntu 24.04 and later, use the .deb instead: Ubuntu blocks the AppImage's sandbox.
 
-Linux builds run on both Wayland and X11. Windows and the AppImage update themselves; the other Linux packages update when you install a newer version.
+Linux builds run on both Wayland and X11. When a new version is out, EventKit shows a **Restart to update** button (Linux asks for your password). On a Mac, it shows a **Download** button instead.
 
 ### Checking your download
 
