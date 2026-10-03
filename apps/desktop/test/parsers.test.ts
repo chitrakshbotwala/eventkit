@@ -42,6 +42,19 @@ Installed packages:
     ]);
   });
 
+  it('reads the coloured output the android CLI writes to a pipe', () => {
+    const out =
+      'Installed packages:\r\n' +
+      '\u001b[32m  build-tools/36.0.0        36.0.0      Android SDK Build-Tools 36   \u001b[39m\u001b[0m\r\n' +
+      '\u001b[32m  platform-tools            37.0.1      Android SDK Platform-Tools   \u001b[39m\u001b[0m\r\n' +
+      '\u001b[32m  platforms/android-36      2.0.0       Android SDK Platform 36      \u001b[39m\u001b[0m\r\n';
+    expect([...parseInstalled(out)].sort()).toEqual([
+      'build-tools;36.0.0',
+      'platform-tools',
+      'platforms;android-36',
+    ]);
+  });
+
   it('ignores packages listed under other sections', () => {
     const out = `Installed packages:
   platform-tools       | 36.0.0  | Android SDK Platform-Tools     | platform-tools

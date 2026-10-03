@@ -12,9 +12,9 @@ export function readJson<T>(file: string, fallback: T): T {
 }
 
 /** Atomic JSON write (write temp + rename) so a crash never leaves a torn file. */
-export function writeJson(file: string, value: unknown) {
+export function writeJson(file: string, value: unknown, opts: { mode?: number } = {}) {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(value, null, 2));
+  writeFileSync(tmp, JSON.stringify(value, null, 2), { mode: opts.mode });
   renameSync(tmp, file);
 }

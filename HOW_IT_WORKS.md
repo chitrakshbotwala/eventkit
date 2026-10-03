@@ -72,7 +72,7 @@ Why each piece is there:
 - **Loopback listener plus PKCE.** The one-time code goes to `127.0.0.1` on the attendee's own laptop. It is useless without the verifier `V`, which never leaves the app. The code also expires after 2 minutes and works only once.
 - **Verified email to RSVP list.** This is the only identity check. If someone RSVP'd with a different address, the app says so and an organizer edits their RSVP email.
 
-After sign-in, the app stores the session token and a per-laptop **device key** in the OS keychain (`safeStorage`). The device key later signs the readiness report and the offline log.
+After sign-in, the app stores the session token and a per-laptop **device key** in the OS keychain (`safeStorage`; on a Linux desktop without a keyring, in a file only the user can read). The device key later signs the readiness report and the offline log.
 
 ### 2. One-click setup
 

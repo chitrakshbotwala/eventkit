@@ -13,7 +13,7 @@ import { manifestSource } from './manifest';
 import { ProgressReporter } from './progress-reporter';
 import { currentQr } from './qr';
 import { submitReadiness } from './readiness';
-import { secureStore } from './secure-store';
+import { preferOsKeyringOnLinux, secureStore } from './secure-store';
 import { msUntilNextWindow } from '@eventkit/shared/node';
 import { realRunners } from './setup/components';
 import { Downloader } from './setup/downloader';
@@ -31,6 +31,7 @@ import { homedir } from 'node:os';
 import { flutterBin } from './setup/paths';
 import { installDirs } from './setup/paths';
 
+preferOsKeyringOnLinux();
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
