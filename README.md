@@ -136,7 +136,7 @@ deploy            VPS files: Caddyfile, systemd unit, production .env template, 
   - No email is ever sent.
 - **Secrets.**
   - Session tokens and sign-in codes are stored only as hashes.
-  - The desktop session, device key and QR secret are encrypted with the OS keychain (`safeStorage`).
+  - The desktop session, device key and QR secret are encrypted with the OS keychain (`safeStorage`): DPAPI on Windows, Keychain on macOS, and on Linux the Secret Service (gnome-keyring, KeePassXC) or KWallet. The app asks for the Secret Service explicitly when one is running on a window manager Chromium doesn't recognise, such as Hyprland (Omarchy), sway or i3. A Linux session with no keyring service at all still signs in: secrets are then encrypted with AES-256-GCM under a random key in `secret.key`, and both files are readable only by their owner (0600). The app log says which applies.
   - Logs redact tokens, codes and keys.
 - **Admin.**
   - argon2id passwords, optional TOTP 2FA, httpOnly SameSite=Strict cookies, and an Origin check on every mutation.

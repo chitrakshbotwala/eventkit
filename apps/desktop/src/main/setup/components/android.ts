@@ -40,7 +40,10 @@ function sdkArgs(ctx: ComponentContext) {
 export function parseInstalled(out: string): Set<string> {
   const set = new Set<string>();
   let installedSection = true;
-  for (const line of out.split(/\r?\n/)) {
+  // The android CLI colours each package line, even when its output is piped.
+  // eslint-disable-next-line no-control-regex
+  const plain = out.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '');
+  for (const line of plain.split(/\r?\n/)) {
     // Section headers ("Installed packages:", "Available Updates:") are unindented.
     if (/^\S.*:\s*$/.test(line)) {
       installedSection = /^installed packages:/i.test(line);
