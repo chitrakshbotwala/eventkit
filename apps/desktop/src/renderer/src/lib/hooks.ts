@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AppInfo, AuthState, LogLine, Phase2View, QrView, SetupSnapshot } from '@common/ipc';
+import type {
+  AppInfo,
+  AuthState,
+  LogLine,
+  Phase2View,
+  QrView,
+  SetupSnapshot,
+  UpdateView,
+} from '@common/ipc';
 
 export const ek = window.eventkit;
 
@@ -18,6 +26,15 @@ export function useAuth() {
     return ek.on('auth:changed', setState);
   }, []);
   return [state, setState] as const;
+}
+
+export function useUpdates() {
+  const [view, setView] = useState<UpdateView | null>(null);
+  useEffect(() => {
+    void ek.updates.state().then(setView);
+    return ek.on('update:changed', setView);
+  }, []);
+  return view;
 }
 
 export function useSetup() {

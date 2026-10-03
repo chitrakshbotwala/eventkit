@@ -26,7 +26,7 @@ import { Phase2Controller } from './phase2/controller';
 import { createTray, setTrayStatus } from './tray';
 import { runSetupTest } from './setup-test';
 import { runSmokeTest } from './smoke';
-import { startAutoUpdate } from './updater';
+import { checkForUpdates, installUpdate, startAutoUpdate, updateView } from './updater';
 import { createMainWindow, getMainWindow, hardenApp } from './window';
 import { homedir } from 'node:os';
 import { flutterBin } from './setup/paths';
@@ -268,6 +268,10 @@ function registerIpc() {
   handle(CHANNELS.logsOpenFolder, null, async () => {
     await shell.openPath(paths.logs());
   });
+
+  handle(CHANNELS.updateState, null, () => updateView());
+  handle(CHANNELS.updateCheck, null, () => checkForUpdates());
+  handle(CHANNELS.updateInstall, null, () => installUpdate());
 }
 
 function diagnostics(): string {
@@ -331,7 +335,10 @@ app
     powerMonitor.on('suspend', () => phase2.onSuspend());
     powerMonitor.on('resume', () => phase2.onResume());
     phase2.start();
-    startAutoUpdate({ canCheck: () => !phase2.isActive });
+    startAutoUpdate({
+      canCheck: () => !phase2.isActive,
+      onChange: (v) => send('update:changed', v),
+    });
 
     scheduleQrTick();
     if (auth.state().signedIn) {

@@ -2,6 +2,18 @@ import { app, type BrowserWindow } from 'electron';
 import { writeFileSync } from 'node:fs';
 import { logger } from './logger';
 import { secureStore } from './secure-store';
+import { checkForUpdates, updateView } from './updater';
+
+/** With EVENTKIT_SMOKE_UPDATE=1, also check the update feed and wait for the outcome. */
+async function settleUpdateCheck() {
+  await checkForUpdates();
+  const until = Date.now() + 8 * 60_000;
+  const settled = ['up-to-date', 'available', 'ready', 'error'];
+  while (!settled.includes(updateView().state) && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return updateView();
+}
 
 /**
  * Release CI launches every packaged build with EVENTKIT_SMOKE_TEST=<result file>. The
@@ -18,6 +30,7 @@ export function runSmokeTest(win: BrowserWindow, resultFile: string) {
     const result = {
       ok,
       detail,
+      update: process.env['EVENTKIT_SMOKE_UPDATE'] === '1' ? updateView() : undefined,
       version: app.getVersion(),
       platform: `${process.platform}/${process.arch}`,
       ozonePlatform: app.commandLine.getSwitchValue('ozone-platform') || null,
@@ -34,7 +47,8 @@ export function runSmokeTest(win: BrowserWindow, resultFile: string) {
       app.exit(ok ? 0 : 1);
     }
   };
-  const timer = setTimeout(() => finish(false, 'window did not load within 90 s'), 90_000);
+  const limit = process.env['EVENTKIT_SMOKE_UPDATE'] === '1' ? 10 * 60_000 : 90_000;
+  const timer = setTimeout(() => finish(false, 'smoke test did not finish in time'), limit);
 
   win.webContents.once('did-fail-load', (_e, code, description) =>
     finish(false, `renderer failed to load: ${code} ${description}`),
@@ -45,10 +59,13 @@ export function runSmokeTest(win: BrowserWindow, resultFile: string) {
   win.webContents.once('did-finish-load', () => {
     win.webContents
       .executeJavaScript('window.eventkit.auth.state().then((s) => JSON.stringify(s))', true)
-      .then((state: string) => {
+      .then(async (state: string) => {
         // Sign-in stores the session here: a desktop without a usable keyring must still work.
         const storage = secureStore.selfTest();
-        finish(true, `IPC round trip ok: ${state}; secure storage: ${storage}`);
+        const detail = `IPC round trip ok: ${state}; secure storage: ${storage}`;
+        if (process.env['EVENTKIT_SMOKE_UPDATE'] !== '1') return finish(true, detail);
+        const update = await settleUpdateCheck();
+        finish(update.state !== 'error', `${detail}; update: ${update.state}`);
       })
       .catch((err: unknown) => finish(false, `IPC round trip failed: ${String(err)}`));
   });

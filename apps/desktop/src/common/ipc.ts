@@ -99,6 +99,27 @@ export interface Phase2View {
   projectDir: string | null;
 }
 
+export interface UpdateView {
+  /**
+   * install: this build downloads and installs updates itself (Windows, AppImage, deb, rpm,
+   * pacman). download: it can only point to the download page (unsigned macOS builds).
+   * off: development builds, or an install EventKit can't update.
+   */
+  mode: 'install' | 'download' | 'off';
+  current: string;
+  state: 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error';
+  /** The newer version, once one is found. */
+  latest: string | null;
+  /** Download progress, 0-100. */
+  percent: number | null;
+  error: string | null;
+  checkedAt: string | null;
+  /** Set while updates wait (the offline phase). */
+  paused: string | null;
+  /** Release page for downloading by hand. */
+  downloadUrl: string | null;
+}
+
 export interface LogLine {
   t: number;
   level: 'debug' | 'info' | 'warn' | 'error';
@@ -146,6 +167,13 @@ export interface EventKitApi {
     recent(): Promise<LogLine[]>;
     openFolder(): Promise<void>;
   };
+  updates: {
+    state(): Promise<UpdateView>;
+    /** Check the release feed now. */
+    check(): Promise<UpdateView>;
+    /** Quit, install the downloaded update and start the new version. */
+    install(): Promise<void>;
+  };
   on<E extends keyof EventMap>(event: E, cb: (payload: EventMap[E]) => void): () => void;
 }
 
@@ -155,6 +183,7 @@ export interface EventMap {
   'log:line': LogLine;
   'qr:changed': QrView;
   'phase2:changed': Phase2View;
+  'update:changed': UpdateView;
 }
 
 export const EVENT_NAMES: ReadonlyArray<keyof EventMap> = [
@@ -163,6 +192,7 @@ export const EVENT_NAMES: ReadonlyArray<keyof EventMap> = [
   'log:line',
   'qr:changed',
   'phase2:changed',
+  'update:changed',
 ];
 
 /** Invoke channel names (renderer -> main). */
@@ -190,6 +220,9 @@ export const CHANNELS = {
   runDoctor: 'tools:runDoctor',
   logsRecent: 'logs:recent',
   logsOpenFolder: 'logs:openFolder',
+  updateState: 'update:state',
+  updateCheck: 'update:check',
+  updateInstall: 'update:install',
 } as const;
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
