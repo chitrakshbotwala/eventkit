@@ -48,6 +48,8 @@ export const config = {
   startHidden: process.argv.includes('--hidden'),
   /** Release CI: load the window, check IPC, write the result to this file and quit. */
   smokeTestResult: process.env['EVENTKIT_SMOKE_TEST'] || null,
+  /** CI: run the real setup without sign-in, write a report to this file and quit. */
+  setupTestResult: process.env['EVENTKIT_SETUP_TEST'] || null,
   /** "owner/repo" whose GitHub Releases feed auto-update; otherwise <server>/updates/. */
   updateRepo: import.meta.env.MAIN_VITE_UPDATE_REPO || null,
 };
