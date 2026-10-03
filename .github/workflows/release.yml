@@ -252,6 +252,19 @@ jobs:
             scripts/smoke-test.sh "$appimage" --ozone-platform=wayland
           echo "::endgroup::"
 
+          # Sessions above have no keyring (secrets fall back to file permissions). On a
+          # window manager Chromium doesn't recognise (Hyprland, sway, i3) with gnome-keyring
+          # running, secrets must go to the keyring, as on Omarchy.
+          echo "::group::Hyprland-like session with gnome-keyring"
+          sudo apt-get install -y --no-install-recommends gnome-keyring
+          DISPLAY=:99 XDG_CURRENT_DESKTOP=Hyprland dbus-run-session -- bash -c '
+            echo -n "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            scripts/smoke-test.sh "$0" | tee "$RUNNER_TEMP/keyring.txt"
+          ' "$appimage"
+          grep -q "secure storage: gnome_libsecret" "$RUNNER_TEMP/keyring.txt" ||
+            { echo "::error::secrets did not use the Secret Service on an unrecognised desktop"; exit 1; }
+          echo "::endgroup::"
+
       - uses: actions/upload-artifact@v4
         with:
           name: eventkit-${{ matrix.target }}

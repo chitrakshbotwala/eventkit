@@ -1,6 +1,7 @@
 import { app, type BrowserWindow } from 'electron';
 import { writeFileSync } from 'node:fs';
 import { logger } from './logger';
+import { secureStore } from './secure-store';
 
 /**
  * Release CI launches every packaged build with EVENTKIT_SMOKE_TEST=<result file>. The
@@ -44,7 +45,11 @@ export function runSmokeTest(win: BrowserWindow, resultFile: string) {
   win.webContents.once('did-finish-load', () => {
     win.webContents
       .executeJavaScript('window.eventkit.auth.state().then((s) => JSON.stringify(s))', true)
-      .then((state: string) => finish(true, `IPC round trip ok: ${state}`))
+      .then((state: string) => {
+        // Sign-in stores the session here: a desktop without a usable keyring must still work.
+        const storage = secureStore.selfTest();
+        finish(true, `IPC round trip ok: ${state}; secure storage: ${storage}`);
+      })
       .catch((err: unknown) => finish(false, `IPC round trip failed: ${String(err)}`));
   });
 }
